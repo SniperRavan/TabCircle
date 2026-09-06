@@ -156,7 +156,8 @@ MainActor.assumeIsolated {
                 folders.remove(path: path)
                 let name = URL(fileURLWithPath: path).lastPathComponent
                 Toast.show(L10n.t("已取消收藏「\(name)」",
-                                  "Removed “\(name)” from favorites"))
+                                  "Removed “\(name)” from favorites"),
+                           detail: path)
             }
         }
         statusItem.onFolderOpened = { path, opener in
@@ -177,11 +178,13 @@ MainActor.assumeIsolated {
             switch folders.add(path: path) {
             case .added:
                 Toast.show(L10n.t("已收藏「\(name)」",
-                                  "Added “\(name)” to favorites"))
+                                  "Added “\(name)” to favorites"),
+                           detail: path)
                 return true
             case .movedToFront:
                 Toast.show(L10n.t("「\(name)」已在收藏里，移到最前",
-                                  "“\(name)” is already a favorite — moved to front"))
+                                  "“\(name)” is already a favorite — moved to front"),
+                           detail: path, kind: .info)
                 return true
             case .invalid:
                 return false

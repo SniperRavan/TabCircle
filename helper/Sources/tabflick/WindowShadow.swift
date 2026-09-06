@@ -40,7 +40,20 @@ enum WindowShadow {
     /// 参数读回来全是 0，那会儿写进去的值会被随后的初始化覆盖掉（现象就是
     /// 「自己回读是新值、别的进程读到的和屏幕上看到的都还是旧的小阴影」，
     /// 踩过一次）。实测等 ~28ms（2 次）就绪，落在 70ms 的淡入期内，看不到跳变。
-    static func applyStandardWindowShadow(to window: NSWindow, attempt: Int = 0) {
+    static func applyStandardWindowShadow(to window: NSWindow) {
+        apply(to: window, deviation: standardDeviation, density: density, offsetY: offsetY)
+    }
+
+    /// Toast 那种小胶囊用的中间档。
+    ///
+    /// 标准档（sd 32.9 / offsetY 18）是照整块窗口调的，套到一条 38pt 高的胶囊上
+    /// 阴影比它本人还厚、还整体偏下一截，看着像贴歪了。这一档只是「浮起来」。
+    static func applyCompactShadow(to window: NSWindow) {
+        apply(to: window, deviation: 22, density: 0.32, offsetY: 8)
+    }
+
+    private static func apply(to window: NSWindow, deviation: Float, density: Float,
+                              offsetY: Int32, attempt: Int = 0) {
         guard !unavailable,
               let cid = connectionID, let set = setShadow, let get = getShadow else { return }
         // windowNumber 在窗口没上屏时可能 ≤ 0，`UInt32(负数)` 会直接崩。
@@ -64,12 +77,13 @@ enum WindowShadow {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.008) {
                 guard window.isVisible else { return }
-                applyStandardWindowShadow(to: window, attempt: attempt + 1)
+                apply(to: window, deviation: deviation, density: density,
+                      offsetY: offsetY, attempt: attempt + 1)
             }
             return
         }
 
-        _ = set(cid, wid, standardDeviation, density, 0, offsetY)
+        _ = set(cid, wid, deviation, density, 0, offsetY)
         invalidate?(cid, wid)
     }
 

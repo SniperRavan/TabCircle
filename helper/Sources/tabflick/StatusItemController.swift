@@ -606,11 +606,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 MainActor.assumeIsolated {
                     if let error {
                         log("⚠️  open folder failed: \(error.localizedDescription)")
-                        Toast.show(L10n.t("打开失败：\(error.localizedDescription)",
-                                          "Failed to open: \(error.localizedDescription)"))
+                        // 错误描述往往一长句，塞进标题只会被掐成一截 ——
+                        // 让它走副标题那行，标题只说成没成
+                        Toast.show(L10n.t("打开失败", "Failed to open"),
+                                   detail: error.localizedDescription, kind: .failure)
                     } else {
                         Toast.show(L10n.t("已在 \(appName) 打开「\(folderName)」",
-                                          "Opened “\(folderName)” in \(appName)"))
+                                          "Opened “\(folderName)” in \(appName)"),
+                                   detail: path)
                     }
                 }
             }
@@ -638,7 +641,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         guard let path = sender.representedObject as? String else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(path, forType: .string)
-        Toast.show(L10n.t("已拷贝路径", "Path copied"))
+        Toast.show(L10n.t("已拷贝路径", "Path copied"), detail: path)
     }
 
     @objc private func removeFolder(_ sender: NSMenuItem) {
