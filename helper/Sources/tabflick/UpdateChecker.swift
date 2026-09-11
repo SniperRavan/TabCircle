@@ -340,8 +340,8 @@ final class UpdateChecker: ObservableObject {
 
         if latest.assetURL != nil {
             alert.informativeText = L10n.t(
-                "当前版本 \(currentVersion)。点「下载并安装」后 TabFlick 会自动完成更新并重新启动。",
-                "You have \(currentVersion). TabFlick will download the update, install it, and relaunch automatically."
+                "当前版本 \(currentVersion)。点「下载并安装」，装完自动重启。",
+                "You have \(currentVersion). Download and install — it restarts on its own."
             )
             alert.addButton(withTitle: L10n.t("下载并安装", "Download & Install"))
             alert.addButton(withTitle: L10n.t("稍后", "Later"))
@@ -357,8 +357,8 @@ final class UpdateChecker: ObservableObject {
         } else {
             // 这一版的 release 缺当前架构的 DMG，退回发布页手动下载
             alert.informativeText = L10n.t(
-                "当前版本 \(currentVersion)。这一版没有找到适配本机的安装包，请前往发布页手动下载。",
-                "You have \(currentVersion). No package for this Mac was found in the release — please download it from the releases page."
+                "当前版本 \(currentVersion)。这一版没有适合这台 Mac 的安装包，去发布页手动下载。",
+                "You have \(currentVersion). This release has no package for this Mac — grab one from the releases page."
             )
             alert.addButton(withTitle: L10n.t("前往下载", "Open Download Page"))
             alert.addButton(withTitle: L10n.t("稍后", "Later"))
@@ -393,8 +393,8 @@ final class UpdateChecker: ObservableObject {
         alert.alertStyle = .warning
         alert.messageText = L10n.t("自动更新失败", "Automatic update failed")
         alert.informativeText = message + L10n.t(
-            "\n\n可以前往发布页手动下载安装。",
-            "\n\nYou can download and install it manually from the releases page."
+            "\n\n可以去发布页手动下载。",
+            "\n\nYou can download it manually from the releases page."
         )
         alert.addButton(withTitle: L10n.t("前往下载", "Open Download Page"))
         alert.addButton(withTitle: L10n.t("稍后", "Later"))

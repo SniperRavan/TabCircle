@@ -214,7 +214,7 @@ private struct WhatsNewView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L10n.t("已更新到 \(version)", "Updated to \(version)"))
                         .font(.system(size: 15, weight: .semibold))
-                    Text(L10n.t("这一版带来了这些变化", "Here's what changed"))
+                    Text(L10n.t("这一版改了什么", "What changed"))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -229,7 +229,7 @@ private struct WhatsNewView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 9) {
                     if blocks.isEmpty {
-                        Text(L10n.t("这一版的更新说明暂时取不到，可以到 GitHub 上查看。",
+                        Text(L10n.t("更新说明取不到，可以去 GitHub 看。",
                                     "Couldn't load the notes for this version — they're on GitHub."))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
