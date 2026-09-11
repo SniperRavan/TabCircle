@@ -153,6 +153,10 @@ enum ReleaseNotes {
     }
 
     private static func present(version: String, body: String?) {
+        // 这个「更新内容」是**发布说明里的 markdown 小标题**，不是窗口标题 ——
+        // 它得和 build/v*-notes.md 里 `## 更新内容` / `## What's New` 一字不差。
+        // 底下那行窗口标题长得像，别看见两处一样就一起改：改了这里会挑不到段落，
+        // 而且不报错，只是窗口里空一块。
         let parsed = body.map {
             ReleaseNotesParser.blocks(
                 from: ReleaseNotesParser.section(from: $0,
@@ -172,7 +176,7 @@ enum ReleaseNotes {
 
         let w = NSWindow(contentViewController: host)
         w.styleMask = [.titled, .closable]
-        w.title = L10n.t("更新内容", "What's New")
+        w.title = L10n.t("TabFlick 更新内容", "What's New in TabFlick")
         w.isReleasedWhenClosed = false
         w.delegate = WindowWatcher.shared
         // 先把内容布局出来再居中：自适应尺寸的窗口在内容到位前 center()，
