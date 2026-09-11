@@ -144,9 +144,109 @@ private struct SwitcherPane: View {
             } header: {
                 Text(L10n.t("全局切换器", "Global switcher"))
             }
+
+            excludedSection
         }
         .formStyle(.grouped)
         .frame(width: kSettingsPaneWidth)
+    }
+
+    /// 排除名单：这些 App 在前台时全局切换器不接管快捷键。
+    ///
+    /// 只有手工这一份。自动检测做过一版又拆了（2026-09-11）：AX 只读得到
+    /// 摆进菜单栏的绑定，Electron / 自绘界面的 App（Claude、VS Code）把
+    /// ⌃⇥ 判在自己的代码里，系统根本不知道 —— 一个「自动排除」开关打开后
+    /// 照样被抢，比没有这个开关更糟。状态栏菜单的「排除 XX」是快捷入口。
+    ///
+    /// 整段跟着全局切换器开关禁用：关着的时候它一个键都不拦，名单没有含义。
+    @ViewBuilder
+    private var excludedSection: some View {
+        Section {
+            ForEach(sortedExcluded) { app in
+                excludedRow(app)
+            }
+
+            Button {
+                chooseApp()
+            } label: {
+                Label(L10n.t("添加 App…", "Add App…"), systemImage: "plus")
+            }
+            .buttonStyle(.borderless)
+        } header: {
+            Text(L10n.t("排除的 App", "Excluded apps"))
+        }
+        .disabled(!settings.globalSwitcher)
+    }
+
+    /// 按名字排序（添加顺序对找一项没有帮助）。
+    private var sortedExcluded: [ExcludedApp] {
+        settings.globalExcludedApps.sorted {
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private func exclude(bundleID: String, name: String) {
+        guard !settings.globalExcludedApps.contains(where: { $0.bundleID == bundleID }) else { return }
+        settings.globalExcludedApps.append(ExcludedApp(bundleID: bundleID, name: name))
+    }
+
+    private func chooseApp() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = FileManager.default
+            .urls(for: .applicationDirectory, in: .localDomainMask).first
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // bundle id 是判定口径，取不到就没法排除 —— 选中的不是正经 app bundle
+        guard let bundleID = Bundle(url: url)?.bundleIdentifier else {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = L10n.t("这个 App 认不出来", "Can't identify this app")
+            alert.informativeText = L10n.t("读不到它的标识符，换一个试试。",
+                                           "Its identifier couldn't be read. Try another one.")
+            alert.addButton(withTitle: L10n.t("好", "OK"))
+            alert.runModal()
+            return
+        }
+        var name = FileManager.default.displayName(atPath: url.path)
+        if name.hasSuffix(".app") { name = String(name.dropLast(4)) }
+        exclude(bundleID: bundleID, name: name)
+    }
+
+    @ViewBuilder
+    private func excludedRow(_ app: ExcludedApp) -> some View {
+        let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID)
+        HStack(spacing: 8) {
+            if let url {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+            } else {
+                Image(systemName: "app.dashed")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+            }
+            Text(app.name)
+            // App 已卸载时图标降级、名字留着 —— 这条记录还得能被认出来删掉
+            if url == nil {
+                Text(L10n.t("未安装", "Not installed"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                settings.globalExcludedApps.removeAll { $0.bundleID == app.bundleID }
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(L10n.t("取消排除", "Stop excluding"))
+        }
     }
 }
 
@@ -245,7 +345,7 @@ private struct TabManagementPane: View {
         Form {
             Section {
                 if settings.favorites.isEmpty {
-                    Text(L10n.t("还没有置顶。在浏览器里置顶任意标签即可。",
+                    Text(L10n.t("还没有置顶。在浏览器里置顶任意标签。",
                                 "Nothing pinned yet. Pin any tab in your browser."))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -711,8 +811,8 @@ private struct AboutPane: View {
             }
 
             Text(L10n.t(
-                "增强 Chrome 标签体验：最近使用顺序切换、标签管理、置顶常驻。",
-                "Enhance Chrome's tab experience: MRU switching, tab management, and pins that persist."
+                "按最近使用顺序切换标签，外加标签管理和置顶常驻。",
+                "MRU tab switching, plus tab management and pins that persist."
             ))
             .font(.system(size: 12))
             .foregroundStyle(.secondary)

@@ -230,6 +230,28 @@ MainActor.assumeIsolated {
             }
         }
 
+        // 排除当前 App：人刚被抢了键的那一刻就在那个 App 里，从这儿点一下
+        // 比翻设置快。名单只收手工这一份，自动判定是另一条线。
+        statusItem.globalSwitcherEnabled = {
+            MainActor.assumeIsolated { settings.globalSwitcher }
+        }
+        statusItem.isAppExcluded = { bundleID in
+            MainActor.assumeIsolated {
+                settings.globalExcludedApps.contains { $0.bundleID == bundleID }
+            }
+        }
+        statusItem.onToggleExcludeApp = { bundleID, name in
+            MainActor.assumeIsolated {
+                if settings.globalExcludedApps.contains(where: { $0.bundleID == bundleID }) {
+                    settings.globalExcludedApps.removeAll { $0.bundleID == bundleID }
+                    Toast.show(L10n.t("已取消排除 \(name)", "\(name) no longer excluded"))
+                } else {
+                    settings.globalExcludedApps.append(ExcludedApp(bundleID: bundleID, name: name))
+                    Toast.show(L10n.t("已排除 \(name)", "\(name) excluded"))
+                }
+            }
+        }
+
         // 收藏当前标签（绑定优先 + 域名兜底的判定在 MRUController）
         statusItem.favoriteState = {
             MainActor.assumeIsolated { controller.currentTabFavorited }
@@ -268,11 +290,27 @@ MainActor.assumeIsolated {
         settings.onHotkeyChange = applyHotkeys
         applyHotkeys()
 
-        // 全局切换器开关：拦截范围（tap 里的 enabled 标志）和就绪状态
+        // 全局切换器的排除名单。tap 只认 bundle id，名字只是设置页的门面。
+        let applyExclusions = {
+            MainActor.assumeIsolated {
+                configureExcludedApps(Set(settings.globalExcludedApps.map(\.bundleID)))
+            }
+        }
+        applyExclusions()
+
+        // 启动那一瞬间前台多半还是我们自己（open 激活了一下），算出来的排除
+        // 标志是错的对象。等前台落定再算一次 —— 否则用户不切走再切回来，
+        // 他此刻正用着的那个 App 就算在名单里也照抢不误（实测过）。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            MainActor.assumeIsolated { refreshFrontmostAppState() }
+        }
+
+        // 全局切换器开关 / 排除名单：拦截范围（tap 里的标志）和就绪状态
         // 都得当场重算，否则要等下一次 MRU 推送才生效。
         settings.onInterceptScopeChange = { [weak controller] in
             MainActor.assumeIsolated {
                 applyHotkeys()
+                applyExclusions()
                 controller?.refreshReadiness()
             }
         }
@@ -353,7 +391,7 @@ MainActor.assumeIsolated {
                             键盘钩子被系统反复禁用，为避免影响你正常打字，TabFlick 已主动停用它。
                             ⌃⇥ 现在回落到 Chrome 自带的切换方式。
 
-                            重启 TabFlick 可以恢复。如果反复出现，请到 GitHub 反馈。
+                            重启 TabFlick 可以恢复。反复出现的话去 GitHub 反馈。
                             """,
                             """
                             The keyboard hook was repeatedly disabled by the system, so TabFlick \
@@ -379,7 +417,7 @@ MainActor.assumeIsolated {
                                                    "Accessibility permission was removed")
                         alert.informativeText = L10n.t(
                             """
-                            TabFlick 已立即停用键盘钩子，不会影响你正常使用键盘。⌃⇥ 回落到                             Chrome 自带的切换方式。
+                            TabFlick 已经停用键盘钩子，不影响你正常打字。⌃⇥ 回落到                             Chrome 自带的切换方式。
 
                             重新授予权限后，需要退出并重新打开 TabFlick 才会生效 ——                             macOS 只在进程启动时读取这项权限。
                             """,

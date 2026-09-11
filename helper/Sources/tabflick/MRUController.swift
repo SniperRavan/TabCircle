@@ -694,7 +694,7 @@ final class MRUController {
         }
         // 用户可能此刻就站在这个浏览器里 —— 立刻重算前台判定，
         // 否则要等下一次 App 切换才生效（表现为「第一次按没反应」）
-        refreshFrontmostBrowserState()
+        refreshFrontmostAppState()
         // 身份确定后把**属于它的**收藏推过去（初次 requestSettings 时
         // 身份可能还没解析出来，发的是兜底浏览器那份）
         pushSettings(to: id)

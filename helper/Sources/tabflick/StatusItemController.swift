@@ -44,6 +44,22 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// 下原来没有任何收藏入口（2026-09-04 用户要求）。
     private let addFolderItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
 
+    /// 「把当前 App 加进 / 移出排除名单」。前台不是浏览器时才出现 ——
+    /// 刚被抢了键的那一刻，人就在那个 App 里，比翻设置快得多。
+    /// 不和置顶 / Finder 那两项共用槽位：它俩互斥，这条跟 Finder 那条
+    /// 并不互斥（Finder 自己也用着 ⌃⇥，照样该能一键排掉）。
+    private let excludeAppItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    /// 菜单打开那一刻记下的前台 App，供点击时使用 —— 点下去的时候前台
+    /// 已经是我们自己了，那会儿再查就晚了。
+    private var frontAppForExclude: (bundleID: String, name: String)?
+
+    /// 这个 App 在不在排除名单里（决定菜单项是加还是移出）。
+    var isAppExcluded: ((String) -> Bool)?
+    /// 点了排除 / 取消排除。参数是前台 App 的 bundle id 和显示名。
+    var onToggleExcludeApp: ((String, String) -> Void)?
+    /// 全局切换器开着没有。关着时它一个键都不拦，这一项没有意义，整项隐藏。
+    var globalSwitcherEnabled: (() -> Bool)?
+
     /// 动作槽前后的两道分隔线。动作项按前台上下文显隐后，相邻的分隔线
     /// 会叠在一起，得跟着收敛（见 menuNeedsUpdate）。每次 buildMenu
     /// 重建新实例，不跨菜单复用；sepAfterPin 兼任文件夹列表的插入锚点。
@@ -176,6 +192,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         addFinderFolderItem.isEnabled = true
         menu.addItem(addFinderFolderItem)
 
+        excludeAppItem.target = self
+        excludeAppItem.action = #selector(toggleExcludeCurrentApp)
+        excludeAppItem.isEnabled = true
+        menu.addItem(excludeAppItem)
+
         sepAfterPin = .separator()
         menu.addItem(sepAfterPin)
 
@@ -184,7 +205,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         addFolderItem.target = self
         addFolderItem.action = #selector(pickFolder)
         addFolderItem.title = L10n.t("添加文件夹…", "Add Folder…")
-        addFolderItem.image = Self.symbol("plus.circle")
+        addFolderItem.image = Self.symbol("plus.rectangle.on.folder")
         addFolderItem.isEnabled = true
         menu.addItem(addFolderItem)
 
@@ -256,10 +277,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // 点了也「成功」，只会让人懵（2026-09-02 用户反馈）。
         // 状态栏菜单不抢激活（accessory app，弹 alert 都得显式 NSApp.activate
         // 就是旁证），所以打开菜单这一刻 frontmost 还是用户正在用的 App。
-        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let frontApp = NSWorkspace.shared.frontmostApplication
+        let front = frontApp?.bundleIdentifier
         let pinVisible = refreshFavoriteItem(browserIsFront: BrowserSupport.isSupported(front))
         let finderIsFront = front == "com.apple.finder"
         addFinderFolderItem.isHidden = !finderIsFront
+        let excludeVisible = refreshExcludeItem(frontApp)
         refreshFolderLines(in: menu)
         refreshWarningItem()
 
@@ -267,7 +290,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // 只在动作槽可见时要。文件夹区因「添加文件夹…」常驻而永远有内容，
         // 顶上那道分隔线不用收敛。
         if !unauthorized {
-            sepAfterPin.isHidden = !(pinVisible || finderIsFront)
+            sepAfterPin.isHidden = !(pinVisible || finderIsFront || excludeVisible)
         }
     }
 
@@ -326,6 +349,36 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func warningClicked() {
         onExtensionWarningClick?()
+    }
+
+    /// 返回菜单项是否可见。浏览器前台时藏起来 —— 在浏览器里排除浏览器
+    /// 没有意义（那个键本来就归浏览器内切换器），我们自己同理。
+    private func refreshExcludeItem(_ app: NSRunningApplication?) -> Bool {
+        frontAppForExclude = nil
+        excludeAppItem.isHidden = true
+        guard globalSwitcherEnabled?() ?? false,
+              let app,
+              let bundleID = app.bundleIdentifier,
+              bundleID != Bundle.main.bundleIdentifier,
+              !BrowserSupport.isSupported(bundleID) else { return false }
+
+        let name = app.localizedName ?? bundleID
+        frontAppForExclude = (bundleID, name)
+        excludeAppItem.isHidden = false
+        // 图标跟着状态走（同置顶那条）：举手 = 拦下这个 App 的键，
+        // 划掉的举手 = 不再拦。固定一个禁止号的话，「取消排除」读起来
+        // 成了「禁止取消」。
+        let excluded = isAppExcluded?(bundleID) ?? false
+        excludeAppItem.title = excluded
+            ? L10n.t("取消排除 \(name)", "Stop Excluding \(name)")
+            : L10n.t("排除 \(name)", "Exclude \(name)")
+        excludeAppItem.image = Self.symbol(excluded ? "hand.raised.slash" : "hand.raised")
+        return true
+    }
+
+    @objc private func toggleExcludeCurrentApp() {
+        guard let app = frontAppForExclude else { return }
+        onToggleExcludeApp?(app.bundleID, app.name)
     }
 
     /// 返回菜单项是否可见（浏览器不在前台时整项隐藏）。

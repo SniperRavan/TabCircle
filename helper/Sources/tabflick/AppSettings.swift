@@ -65,6 +65,18 @@ enum GlobalSwitcherStyle: String, CaseIterable, Identifiable {
     }
 }
 
+/// 全局切换器的排除项：这个 App 在前台时，全局切换器不接管快捷键。
+///
+/// 身份是 bundle id（判定只认它，localizedName 在中文系统下对不上）。
+/// name 是添加那一刻记下来的显示名，纯展示用 —— App 卸载后 Launch Services
+/// 查不到名字，列表总不能摆一串反向域名让用户猜。
+struct ExcludedApp: Codable, Identifiable, Equatable {
+    let bundleID: String
+    let name: String
+
+    var id: String { bundleID }
+}
+
 /// 收藏的标签：浏览器每次连上都保证它存在且置顶（Arc 收藏位的 Chrome 版）。
 ///
 /// 识别按**域名**而不是完整 URL —— 置顶型标签（Gmail、Notion 这类 webapp）
@@ -243,6 +255,7 @@ final class AppSettings: ObservableObject {
         static let globalHotkey = "globalHotkey"
         static let globalSwitcher = "globalSwitcher"
         static let globalSwitcherStyle = "globalSwitcherStyle"
+        static let globalExcludedApps = "globalExcludedApps"
         static let knownBrowsers = "knownBrowsers"
         static let pendingUnpins = "pendingUnpins"
     }
@@ -325,7 +338,22 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// 影响 event tap 拦截范围的设置变了（目前只有全局切换器开关）。
+    /// 全局切换器的排除名单：这些 App 在前台时不接管快捷键。
+    ///
+    /// 默认空。这是用户手里唯一能解开「⌃⇥ 被抢走」的扳手 —— 自己也用 ⌃⇥ 的
+    /// App（终端、编辑器、Safari / Firefox）我们既探测不到、也不该替用户决定
+    /// 谁赢。纯 helper 侧，但改的是拦截范围，走 onInterceptScopeChange。
+    @Published var globalExcludedApps: [ExcludedApp] {
+        didSet {
+            guard oldValue != globalExcludedApps else { return }
+            if let data = try? JSONEncoder().encode(globalExcludedApps) {
+                UserDefaults.standard.set(data, forKey: Key.globalExcludedApps)
+            }
+            onInterceptScopeChange?()
+        }
+    }
+
+    /// 影响 event tap 拦截范围的设置变了（全局切换器开关、排除名单）。
     /// 不走 onChange —— 那是推给扩展用的，这条纯 helper 侧。
     var onInterceptScopeChange: (() -> Void)?
 
@@ -477,6 +505,8 @@ final class AppSettings: ObservableObject {
             .flatMap { try? JSONDecoder().decode(HotkeyConfig.self, from: $0) }
         globalSwitcher = defaults.bool(forKey: Key.globalSwitcher)   // 未设置即默认 false
         globalSwitcherStyle = GlobalSwitcherStyle(rawValue: defaults.string(forKey: Key.globalSwitcherStyle) ?? "") ?? .list
+        globalExcludedApps = defaults.data(forKey: Key.globalExcludedApps)
+            .flatMap { try? JSONDecoder().decode([ExcludedApp].self, from: $0) } ?? []
         knownBrowsers = defaults.stringArray(forKey: Key.knownBrowsers) ?? []
         pendingUnpins = defaults.data(forKey: Key.pendingUnpins)
             .flatMap { try? JSONDecoder().decode([PendingUnpin].self, from: $0) } ?? []

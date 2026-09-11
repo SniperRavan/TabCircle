@@ -22,15 +22,33 @@ func setActiveBrowserChangeHandler(_ handler: (() -> Void)?) {
     gOnActiveBrowserChange = handler
 }
 
-/// 重算「前台是不是受支持浏览器」。除了 App 切换时调用，
-/// BrowserSupport.connected 变化后也必须调一次：扩展连上并识别出身份时，
-/// 用户可能早已站在那个浏览器里 —— 等下一次 App 切换才生效，
-/// 表现就是「第一次按没反应」。
+/// 全局切换器的排除名单（bundle id）及「前台是不是其中之一」的缓存标志。
+///
+/// 判定只认 bundle id，理由同 gFrontIsBrowser。标志必须**预先算好** ——
+/// 回调里绝不能查 frontmostApplication（跨进程调用）。
+private var gExcludedBundleIDs: Set<String> = []
+private var gFrontIsExcluded = false
+
+/// 排除名单变化时由主线程调用。顺带重算前台标志：用户可能正站在刚被
+/// 排除的那个 App 里（设置窗口是我们自己的，关掉就回到它），
+/// 等下一次 App 切换才生效等于「改了没反应」。
 @MainActor
-func refreshFrontmostBrowserState() {
+func configureExcludedApps(_ bundleIDs: Set<String>) {
+    gExcludedBundleIDs = bundleIDs
+    refreshFrontmostAppState()
+}
+
+/// 重算前台 App 的两个判定标志：是不是受支持浏览器、是不是被排除。
+///
+/// 除了 App 切换时调用，BrowserSupport.connected 变化后也必须调一次：
+/// 扩展连上并识别出身份时，用户可能早已站在那个浏览器里 —— 等下一次
+/// App 切换才生效，表现就是「第一次按没反应」。
+@MainActor
+func refreshFrontmostAppState() {
     let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
     let previous = ChromeWindowLocator.activeBundleID
     gFrontIsBrowser = BrowserSupport.isSupported(front)
+    gFrontIsExcluded = front.map(gExcludedBundleIDs.contains) ?? false
     if gFrontIsBrowser, let front { ChromeWindowLocator.activeBundleID = front }
     if ChromeWindowLocator.activeBundleID != previous { gOnActiveBrowserChange?() }
 }
@@ -175,35 +193,16 @@ private var gLastTapDisable: CFAbsoluteTime = 0
 private let kMaxRapidDisables = 3
 private let kRapidWindow: CFAbsoluteTime = 10
 
-/// 这一下按键该唤出哪个切换器。
-private enum SwitchMode {
-    /// 当前浏览器的标签（原有行为）。
-    case browser
-    /// 所有已连接浏览器的标签，按浏览器分组。
-    case global
-}
-
-/// 把「按了哪个键 + 前台是不是浏览器」解析成切换器模式，nil = 与我们无关，放行。
-///
-/// 两条规则：
-///   - **不同键**：各归各的。全局键在浏览器前台也生效（想跨浏览器找标签时
-///     不必先切出浏览器）；切换器键只在浏览器前台生效。
-///   - **同一个键**（默认，两者都是 ⌃⇥）：浏览器在前台 → 当前浏览器切换器
-///     优先；前台不是浏览器 → 全局切换器。
-///
-/// 注意修饰键用 `contains` 而不是相等：⇧ 要能叠上去表示反向，所以 ⌃⇥ 和
-/// ⌃⇧⇥ 都算命中同一个键。这也意味着两个键的修饰键互为子集时会双命中
-/// （⌃⇥ 与 ⌃⌥⇥），此时按同键规则走 —— 让「浏览器优先」成为唯一的兜底答案，
-/// 比按定义顺序碰运气强。
+/// 把当前的键位配置和前台判定交给纯函数决策（规则和判定表见 SwitchMode.swift）。
 private func resolveSwitchMode(code: Int64, flags: CGEventFlags) -> SwitchMode? {
-    let hitsSwitcher = code == gSwitchKeyCode && flags.contains(gSwitchModifiers)
-    let hitsGlobal = gGlobalEnabled && code == gGlobalKeyCode && flags.contains(gGlobalModifiers)
-
-    if hitsSwitcher && hitsGlobal { return gFrontIsBrowser ? .browser : .global }
-    if hitsGlobal { return .global }
-    // 切换器键在非浏览器前台不属于我们 —— 放行给终端/编辑器自己的 ⌃⇥
-    if hitsSwitcher { return gFrontIsBrowser ? .browser : nil }
-    return nil
+    SwitcherHotkeys(switchKeyCode: gSwitchKeyCode,
+                    switchModifiers: gSwitchModifiers,
+                    globalKeyCode: gGlobalKeyCode,
+                    globalModifiers: gGlobalModifiers,
+                    globalEnabled: gGlobalEnabled)
+        .mode(code: code, flags: flags,
+              frontIsBrowser: gFrontIsBrowser,
+              frontIsExcluded: gFrontIsExcluded)
 }
 
 private func tabflickTapCallback(proxy: CGEventTapProxy,
@@ -420,7 +419,7 @@ final class EventTap {
     /// 绝不能用 localizedName —— 那是本地化字符串，中文系统下 Chrome 之外的
     /// 很多 App 名字都不一样，白名单会静默 0 命中。
     private func startTrackingFrontmostApp() {
-        refreshFrontmostBrowserState()
+        refreshFrontmostAppState()
 
         workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -428,7 +427,7 @@ final class EventTap {
             queue: .main
         ) { _ in
             MainActor.assumeIsolated {
-                refreshFrontmostBrowserState()
+                refreshFrontmostAppState()
                 // 从浏览器切走时若还在 cycling，丢弃这一轮，避免状态卡住。
                 // 全局切换器不受这条约束 —— 它起手时前台本来就不是浏览器，
                 // 按这个条件判会被自己的起手状态当场判死。
