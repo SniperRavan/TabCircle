@@ -39,6 +39,15 @@ fi
 
 [ -f assets/TabFlick.icns ] || ./scripts/make-icon.sh
 
+# SDK 版本必须显式喂给链接器（2026-09-15 踩）：Xcode 27 的 SwiftPM 把 SDK 路径
+# 用 `--sysroot` 传给 clang，而这版 clang 只认 `-isysroot`（或 SDKROOT）来读
+# SDK 版本，读不到就把 LC_BUILD_VERSION 的 sdk 写成部署目标 14.0。系统按这个
+# 值判定 app「是按哪代 SDK 写的」—— 14.0 意味着整个 app 拿不到 macOS 26+ 的
+# 外观（设置窗口的 toolbar 分页、菜单、控件全是旧样子）。编译、签名、打包
+# 全程不报错。开发时的 swift run 同样要带（见 scripts/dev-run.sh）。
+SDK_PATH="$(xcrun --show-sdk-path --sdk macosx)"
+SWIFT_SDK_FLAGS=(-Xswiftc -Xclang-linker -Xswiftc -isysroot -Xswiftc -Xclang-linker -Xswiftc "$SDK_PATH")
+
 build_one() {
     local arch="$1"
     local app="$BUILD_DIR/$arch/TabFlick.app"
@@ -46,10 +55,36 @@ build_one() {
     local stage="$BUILD_DIR/dmg-$arch"
 
     echo "▸ [$arch] 编译…"
-    (cd helper && swift build -c release --arch "$arch")
-    # 单架构构建的产物在 .build/<triple>/release；.build/release 只是指向
-    # 「最近一次构建」的符号链接，连续构建两个架构时它会来回切，不能用
-    local bin_dir="$ROOT/helper/.build/$arch-apple-macosx/release"
+    (cd helper && swift build -c release --arch "$arch" "${SWIFT_SDK_FLAGS[@]}")
+    # 产物路径**必须问 SwiftPM 要，不能写死**（2026-09-15 踩）：Xcode 27 起
+    # `--arch` 的产物落到 .build/out/Products/Release，老的
+    # .build/<triple>/release 不再更新但**目录还留在原地** —— 写死那条路径会
+    # 拷到上一次构建的陈旧产物，表现成「版本号是新的、代码是旧的」，编译、
+    # 签名、打包全程不报错（同 PasteMemo beta.6 那类事故）。
+    #
+    # 两个架构返回的是同一个路径，所以必须编完一个立刻拷走（下面就是这个顺序），
+    # 不能先把两个架构都编完再拷。
+    local bin_dir
+    bin_dir="$(cd helper && swift build -c release --arch "$arch" "${SWIFT_SDK_FLAGS[@]}" --show-bin-path)"
+    [ -f "$bin_dir/tabflick" ] || { echo "✗ [$arch] 找不到产物：$bin_dir/tabflick"; exit 1; }
+
+    # 防线：产物记录的 SDK 版本必须是本机 SDK，不能退化成部署目标（14.0）。
+    # 这个值决定系统给不给 macOS 26+ 的外观，错了不报错、只是整个 app 长得旧。
+    local linked_sdk
+    linked_sdk=$(otool -l "$bin_dir/tabflick" | awk '/LC_BUILD_VERSION/{f=1} f&&/sdk/{print $2; exit}')
+    if [ "${linked_sdk%%.*}" -lt 26 ] 2>/dev/null || [ -z "$linked_sdk" ]; then
+        echo "✗ [$arch] 产物链接的 SDK 是 ${linked_sdk:-未知}，不是本机 SDK（$(basename "$SDK_PATH")）"
+        exit 1
+    fi
+
+    # 防线：只要还有源码比产物新，就说明这次构建没真的覆盖到，直接停。
+    # 这类问题唯一的症状就是「改了没生效」，不拦住就得等上线后才发现。
+    local stale_src
+    stale_src=$(find helper/Sources -name '*.swift' -newer "$bin_dir/tabflick" -print -quit)
+    if [ -n "$stale_src" ]; then
+        echo "✗ [$arch] 源码比产物新（$stale_src），构建没生效"
+        exit 1
+    fi
 
     echo "▸ [$arch] 组装 bundle…"
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
