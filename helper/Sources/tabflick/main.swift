@@ -151,6 +151,9 @@ MainActor.assumeIsolated {
         statusItem.favoriteFoldersProvider = {
             MainActor.assumeIsolated { folders.entries }
         }
+        statusItem.inlineFolderLimitProvider = {
+            MainActor.assumeIsolated { settings.inlineFolderLimit }
+        }
         statusItem.onRemoveFolder = { path in
             MainActor.assumeIsolated {
                 folders.remove(path: path)

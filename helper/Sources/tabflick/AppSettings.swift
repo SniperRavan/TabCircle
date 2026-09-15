@@ -143,6 +143,15 @@ struct HotkeyConfig: Codable, Equatable {
         }
     }
 
+    /// 设置页胶囊里的写法：修饰键和主键之间留一个空格（「⌘ Space」），
+    /// 照 Raycast 的样子。菜单和说明文字仍用 `display`。
+    var displaySpaced: String {
+        let d = display
+        let mods = d.prefix { "⌃⌥⇧⌘".contains($0) }
+        let key = d.dropFirst(mods.count)
+        return mods.isEmpty ? String(key) : "\(mods) \(key)"
+    }
+
     /// event tap 匹配用的 CGEventFlags。
     var cgFlags: CGEventFlags {
         var f = CGEventFlags()
@@ -258,6 +267,19 @@ final class AppSettings: ObservableObject {
         static let globalExcludedApps = "globalExcludedApps"
         static let knownBrowsers = "knownBrowsers"
         static let pendingUnpins = "pendingUnpins"
+        static let inlineFolderLimit = "inlineFolderLimit"
+    }
+
+    /// 状态栏平铺文件夹数量的取值范围。下限 1：0 等于「全部收进更多」，
+    /// 那和没有平铺区没区别；上限 20：再多主菜单就比屏幕还高了。
+    static let inlineFolderLimitRange = 1...20
+    static let defaultInlineFolderLimit = 5
+
+    /// 设置页下拉的档位。当前值不在档位里时插进去，保证下拉总有一项对得上。
+    static func inlineFolderLimitChoices(including current: Int) -> [Int] {
+        var choices = [3, 5, 8, 10, 15, 20]
+        if !choices.contains(current) { choices.append(current); choices.sort() }
+        return choices
     }
 
     /// 切换器相关配置变化时通知外部（用来推给扩展）。
@@ -467,6 +489,15 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// 状态栏菜单里平铺的收藏文件夹数量，超出的收进「更多 ▸」。
+    /// 纯 helper 侧展示配置，菜单每次打开时现读，不需要推给扩展。
+    @Published var inlineFolderLimit: Int {
+        didSet {
+            guard oldValue != inlineFolderLimit else { return }
+            UserDefaults.standard.set(inlineFolderLimit, forKey: Key.inlineFolderLimit)
+        }
+    }
+
     /// 自动检查更新的频率。UpdateChecker 到点对账时现读，改动立即生效。
     @Published var updateCheckFrequency: UpdateCheckFrequency {
         didSet {
@@ -512,6 +543,10 @@ final class AppSettings: ObservableObject {
             .flatMap { try? JSONDecoder().decode([PendingUnpin].self, from: $0) } ?? []
         favoriteCurrentUrls = defaults.dictionary(forKey: Key.favoriteCurrentUrls) as? [String: String] ?? [:]
         updateCheckFrequency = UpdateCheckFrequency(rawValue: defaults.string(forKey: Key.updateCheckFrequency) ?? "") ?? .daily
+        // 没存过（0）或手改成越界值都回到范围内，菜单那边不用再防
+        let storedLimit = defaults.integer(forKey: Key.inlineFolderLimit)
+        inlineFolderLimit = Self.inlineFolderLimitRange.contains(storedLimit)
+            ? storedLimit : Self.defaultInlineFolderLimit
 
         let state = LoginItem.state
         launchAtLogin = state == .enabled

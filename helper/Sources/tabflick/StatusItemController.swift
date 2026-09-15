@@ -68,6 +68,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     /// 收藏的文件夹列表数据源。
     var favoriteFoldersProvider: (() -> [FavoriteFolder])?
+    /// 平铺区容量（设置 → 文件夹管理）。nil 用内置默认值。
+    var inlineFolderLimitProvider: (() -> Int)?
     /// 点了「收藏当前 Finder 目录」。
     var onAddFinderFolder: (() -> Void)?
     /// 在「添加文件夹…」面板里选定了一个目录。参数是所选路径，
@@ -112,7 +114,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
         statusLine.title = L10n.t("未授权 —— 需要「辅助功能」权限",
                                   "Not authorized — Accessibility permission required")
-        statusLine.image = Self.symbol("exclamationmark.triangle")
+        statusLine.icon = Self.symbol("exclamationmark.triangle")
     }
     var onCheckForUpdates: (() -> Void)?
 
@@ -163,14 +165,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             let grant = NSMenuItem(title: L10n.t("授权 TabFlick…", "Authorize TabFlick…"),
                                    action: #selector(requestAuthorization), keyEquivalent: "")
             grant.target = self
-            grant.image = Self.symbol("lock.shield")
+            grant.icon = Self.symbol("lock.shield")
             menu.addItem(grant)
             menu.addItem(.separator())
 
             let quitOnly = NSMenuItem(title: L10n.t("退出 TabFlick", "Quit TabFlick"),
                                       action: #selector(quit), keyEquivalent: "q")
             quitOnly.target = self
-            quitOnly.image = Self.symbol("power")
+            quitOnly.icon = Self.symbol("power")
             menu.addItem(quitOnly)
             statusItem.menu = menu
             return
@@ -179,7 +181,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         favoriteItem.target = self
         favoriteItem.action = #selector(toggleFavorite)
         favoriteItem.title = L10n.t("置顶当前标签", "Pin Current Tab")
-        favoriteItem.image = Self.symbol("pin")
+        favoriteItem.icon = Self.symbol("pin")
         favoriteItem.isEnabled = false   // menuNeedsUpdate 时按当前标签刷新
         menu.addItem(favoriteItem)
 
@@ -188,7 +190,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         addFinderFolderItem.target = self
         addFinderFolderItem.action = #selector(addFinderFolder)
         addFinderFolderItem.title = L10n.t("收藏当前 Finder 目录", "Add Current Finder Folder")
-        addFinderFolderItem.image = Self.symbol("folder.badge.plus")
+        addFinderFolderItem.icon = Self.symbol("folder.badge.plus")
         addFinderFolderItem.isEnabled = true
         menu.addItem(addFinderFolderItem)
 
@@ -205,7 +207,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         addFolderItem.target = self
         addFolderItem.action = #selector(pickFolder)
         addFolderItem.title = L10n.t("添加文件夹…", "Add Folder…")
-        addFolderItem.image = Self.symbol("plus.rectangle.on.folder")
+        addFolderItem.icon = Self.symbol("plus.rectangle.on.folder")
         addFolderItem.isEnabled = true
         menu.addItem(addFolderItem)
 
@@ -213,21 +215,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         let updates = NSMenuItem(title: L10n.t("检查更新…", "Check for Updates…"), action: #selector(checkForUpdates), keyEquivalent: "")
         updates.target = self
-        updates.image = Self.symbol("arrow.triangle.2.circlepath")
+        updates.icon = Self.symbol("arrow.triangle.2.circlepath")
         menu.addItem(updates)
 
         let settings = NSMenuItem(title: L10n.t("设置…", "Settings…"),
                                   action: #selector(openSettings),
                                   keyEquivalent: ",")
         settings.target = self
-        settings.image = Self.symbol("gearshape")
+        settings.icon = Self.symbol("gearshape")
         menu.addItem(settings)
 
         menu.addItem(.separator())
 
         let quit = NSMenuItem(title: L10n.t("退出 TabFlick", "Quit TabFlick"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
-        quit.image = Self.symbol("power")
+        quit.icon = Self.symbol("power")
         menu.addItem(quit)
 
         statusItem.menu = menu
@@ -259,7 +261,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // 连接时状态行被浏览器行取代（menuNeedsUpdate 时构建），
         // 只有未连接时它才出场
         statusLine.title = L10n.t("扩展未连接", "Extension not connected")
-        statusLine.image = Self.symbol("exclamationmark.circle")
+        statusLine.icon = Self.symbol("exclamationmark.circle")
         statusLine.isEnabled = false
     }
 
@@ -310,7 +312,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             let item = NSMenuItem(title: L10n.t("\(browser.name) · \(count) 个标签",
                                                 "\(browser.name) · \(count) tab\(count == 1 ? "" : "s")"),
                                   action: nil, keyEquivalent: "")
-            item.image = Self.browserIcon(browser.bundleID)
+            item.icon = Self.browserIcon(browser.bundleID)
             let submenu = NSMenu()
             submenu.autoenablesItems = false
             fillTabsMenu(submenu, browser: browser)
@@ -342,7 +344,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             string: text,
             attributes: [.foregroundColor: NSColor.systemOrange,
                          .font: NSFont.menuFont(ofSize: 0)])
-        warningItem.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill",
+        warningItem.icon = NSImage(systemSymbolName: "exclamationmark.triangle.fill",
                                     accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(paletteColors: [.systemOrange]))
     }
@@ -372,7 +374,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         excludeAppItem.title = excluded
             ? L10n.t("取消排除 \(name)", "Stop Excluding \(name)")
             : L10n.t("排除 \(name)", "Exclude \(name)")
-        excludeAppItem.image = Self.symbol(excluded ? "hand.raised.slash" : "hand.raised")
+        excludeAppItem.icon = Self.symbol(excluded ? "hand.raised.slash" : "hand.raised")
         return true
     }
 
@@ -390,11 +392,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             favoriteItem.title = isFavorited
                 ? L10n.t("取消置顶当前标签", "Unpin Current Tab")
                 : L10n.t("置顶当前标签", "Pin Current Tab")
-            favoriteItem.image = Self.symbol(isFavorited ? "pin.fill" : "pin")
+            favoriteItem.icon = Self.symbol(isFavorited ? "pin.fill" : "pin")
         } else {
             favoriteItem.isEnabled = false
             favoriteItem.title = L10n.t("置顶当前标签", "Pin Current Tab")
-            favoriteItem.image = Self.symbol("pin")
+            favoriteItem.icon = Self.symbol("pin")
         }
         // 设置了快捷键就用系统原生方式显示在菜单项右侧
         if let hotkey = pinHotkeyProvider?() {
@@ -434,7 +436,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 item.target = self
                 // 标签 id 在不同浏览器间会撞号，必须连浏览器身份一起带上
                 item.representedObject = ["tabId": entry.tab.id, "browser": browser.bundleID] as [String: Any]
-                item.image = Self.faviconIcon(entry.icon)
+                item.icon = Self.faviconIcon(entry.icon)
                 if entry.tab.id == entries.first?.tab.id {
                     item.state = .on   // MRU 首位就是当前标签
                 }
@@ -474,7 +476,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             item.target = self
             item.representedObject = ["closedId": entry.tab.id,
                                       "browser": browser.bundleID] as [String: Any]
-            item.image = Self.faviconIcon(entry.icon)
+            item.icon = Self.faviconIcon(entry.icon)
             // 徽标里带上关闭原因：「程序替我关的」和「我自己关的」是完全不同
             // 的两件事，不标出来用户无从判断该不该找回它。
             let reason = entry.tab.reason.label
@@ -491,7 +493,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                                action: #selector(clearClosed(_:)), keyEquivalent: "")
         clear.target = self
         clear.representedObject = browser.bundleID
-        clear.image = Self.symbol("trash")
+        clear.icon = Self.symbol("trash")
         menu.addItem(clear)
     }
 
@@ -505,9 +507,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     // MARK: - 收藏的文件夹
 
-    /// 平铺区容量：按最近打开排的前几个直接躺在主菜单里，
+    /// 平铺区容量的兜底值：按最近打开排的前几个直接躺在主菜单里，
     /// 其余收进「更多 ▸」—— 收藏几十个也不会把主菜单挤爆。
-    private static let kInlineFolderLimit = 5
+    /// 实际数量由设置给（inlineFolderLimitProvider），这里只在没接上时用。
+    private static let kInlineFolderLimit = AppSettings.defaultInlineFolderLimit
 
     /// 「收藏的文件夹」列表：最近打开的前几个平铺，溢出的进「更多 ▸」，
     /// 每条的子菜单列出能打开它的 App。列表**始终显示**（有收藏就列）——
@@ -534,26 +537,25 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // 消歧标题必须对全量算：两个同名夹子一个在平铺、一个在「更多」时，
         // 各算各的就都不带父目录，重名照样分不清。
         let titles = FavoriteFolderStore.displayTitles(folders)
+        let limit = max(1, inlineFolderLimitProvider?() ?? Self.kInlineFolderLimit)
 
-        for (folder, title) in zip(folders.prefix(Self.kInlineFolderLimit),
-                                   titles.prefix(Self.kInlineFolderLimit)) {
+        for (folder, title) in zip(folders.prefix(limit), titles.prefix(limit)) {
             let item = folderMenuItem(folder, title: title, openers: openers)
             menu.insertItem(item, at: insertIndex)
             insertIndex += 1
             folderItems.append(item)
         }
 
-        let overflowFolders = folders.dropFirst(Self.kInlineFolderLimit)
+        let overflowFolders = folders.dropFirst(limit)
         if !overflowFolders.isEmpty {
             // 数量用 badge。试过并进标题（「更多 · 4 个」），用户裁定不如
             // badge 好看（2026-09-02），改回来，别再翻烙饼
             let more = NSMenuItem(title: L10n.t("更多", "More"), action: nil, keyEquivalent: "")
-            more.image = Self.symbol("ellipsis.circle")
+            more.icon = Self.symbol("ellipsis.circle")
             more.badge = NSMenuItemBadge(count: overflowFolders.count)
             let submenu = NSMenu()
             submenu.autoenablesItems = false
-            for (folder, title) in zip(overflowFolders,
-                                       titles.dropFirst(Self.kInlineFolderLimit)) {
+            for (folder, title) in zip(overflowFolders, titles.dropFirst(limit)) {
                 submenu.addItem(folderMenuItem(folder, title: title, openers: openers))
             }
             more.submenu = submenu
@@ -571,7 +573,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let item = NSMenuItem(title: exists ? title : title + L10n.t("（不存在）", " (missing)"),
                               action: nil, keyEquivalent: "")
         item.toolTip = folder.path
-        item.image = exists
+        item.icon = exists
             ? Self.menuIcon(NSWorkspace.shared.icon(forFile: folder.path))
             : Self.symbol("questionmark.folder")
         let submenu = NSMenu()
@@ -592,7 +594,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                                       action: #selector(openFolder(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = ["path": folder.path, "opener": opener] as [String: Any]
-                item.image = Self.menuIcon(NSWorkspace.shared.icon(forFile: opener.url.path))
+                item.icon = Self.menuIcon(NSWorkspace.shared.icon(forFile: opener.url.path))
                 menu.addItem(item)
             }
             menu.addItem(.separator())
@@ -602,14 +604,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                               action: #selector(copyFolderPath(_:)), keyEquivalent: "")
         copy.target = self
         copy.representedObject = folder.path
-        copy.image = Self.symbol("doc.on.doc")
+        copy.icon = Self.symbol("doc.on.doc")
         menu.addItem(copy)
 
         let remove = NSMenuItem(title: L10n.t("取消收藏", "Remove from Favorites"),
                                 action: #selector(removeFolder(_:)), keyEquivalent: "")
         remove.target = self
         remove.representedObject = folder.path
-        remove.image = Self.symbol("folder.badge.minus")
+        remove.icon = Self.symbol("folder.badge.minus")
         menu.addItem(remove)
     }
 
@@ -798,5 +800,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+}
+
+extension NSMenuItem {
+    /// 菜单项图标的唯一入口。macOS 27 起，链接到 26+ SDK 的 app 由 AppKit
+    /// 决定图标显不显示，**默认全部藏掉**（含 favicon、App 图标这类非 symbol
+    /// 图，本机实测）。本项目菜单的约定是「图标要么全有要么全无」，所以每个
+    /// 设了图的项都显式要求显示。直接写 `.image =` 会在 27 上静默没图。
+    var icon: NSImage? {
+        get { image }
+        set {
+            image = newValue
+            if #available(macOS 27, *) {
+                preferredImageVisibility = newValue == nil ? .automatic : .visible
+            }
+        }
     }
 }

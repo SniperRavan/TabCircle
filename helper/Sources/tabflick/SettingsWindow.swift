@@ -506,6 +506,7 @@ private struct FaviconView: View {
 
 private struct FoldersPane: View {
     @ObservedObject var folders: FavoriteFolderStore
+    @ObservedObject var settings: AppSettings
 
     var body: some View {
         Form {
@@ -515,9 +516,10 @@ private struct FoldersPane: View {
                                 "Nothing yet. Use “Add Folder…” in the menu bar, or open a folder in Finder and use “Add Current Finder Folder”."))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                } else if folders.entries.count > 6 {
+                } else if folders.entries.count > 12 {
                     // 收藏多时限高滚动 —— 设置窗口按内容自适应高度，
                     // 列表无限增长会把窗口顶出屏幕（同置顶标签列表）。
+                    // 打开方式拆走后这页只剩这一个列表，12 条以内直接摆开。
                     ScrollView {
                         VStack(spacing: 0) {
                             ForEach(folders.entries, id: \.path) { folder in
@@ -532,16 +534,27 @@ private struct FoldersPane: View {
                         // 行尾的删除按钮会被它压住（2026-09-02 截图实测）
                         .padding(.trailing, 14)
                     }
-                    .frame(height: 220)
+                    .frame(height: 400)
                 } else {
                     ForEach(folders.entries, id: \.path) { folder in
                         folderRow(folder)
                     }
                 }
 
+                // 下拉而不是 Stepper：Stepper 的数字是纯文本，点上去会被选中
+                // 变蓝，用户反馈「太难用」（2026-09-15）。档位之外的值（旧版
+                // Stepper 存下的）也列进去，不然当前值在菜单里没有对应项。
+                Picker(L10n.t("状态栏平铺数量", "Shown in the menu"),
+                       selection: $settings.inlineFolderLimit) {
+                    ForEach(AppSettings.inlineFolderLimitChoices(including: settings.inlineFolderLimit),
+                            id: \.self) { n in
+                        Text(L10n.t("\(n) 个", "\(n)")).tag(n)
+                    }
+                }
+
                 Text(L10n.t(
-                    "状态栏菜单按最近打开排序，平铺前 5 个，其余收在「更多」里。",
-                    "The menu lists the 5 most recently opened; the rest live under More."
+                    "状态栏菜单按最近打开排序，平铺前 \(settings.inlineFolderLimit) 个，其余收在「更多」里。",
+                    "The menu lists the \(settings.inlineFolderLimit) most recently opened; the rest live under More."
                 ))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -552,21 +565,66 @@ private struct FoldersPane: View {
                               "Favorite Folders · \(folders.entries.count)"))
             }
 
+        }
+        .formStyle(.grouped)
+        .frame(width: kSettingsPaneWidth)
+    }
+
+    @ViewBuilder
+    private func folderRow(_ folder: FavoriteFolder) -> some View {
+        HStack(spacing: 8) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: folder.path))
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(folder.name)
+                    .lineLimit(1)
+                Text(folder.path)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Button {
+                folders.remove(path: folder.path)
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(L10n.t("取消收藏", "Remove"))
+        }
+    }
+}
+
+
+// MARK: - 打开方式
+
+/// 「打开方式」管理：只列当前生效的，行尾垃圾桶移除，「添加 App…」
+/// 补回或新增 —— 和收藏列表同一副面孔（2026-09-02 用户点名不要开关，
+/// 要加减）。列表组装和菜单共用 OpenerCatalog。原来和文件夹列表同一页，
+/// 两个列表叠起来页面太长，2026-09-15 拆成独立分页。
+private struct OpenWithPane: View {
+    @ObservedObject var folders: FavoriteFolderStore
+
+    var body: some View {
+        Form {
             openWithSection
         }
         .formStyle(.grouped)
         .frame(width: kSettingsPaneWidth)
     }
 
-    /// 「打开方式」管理：只列当前生效的，行尾垃圾桶移除，「添加 App…」
-    /// 补回或新增 —— 和上面收藏列表同一副面孔（2026-09-02 用户点名
-    /// 不要开关，要加减）。列表组装和菜单共用 OpenerCatalog。
     @ViewBuilder
     private var openWithSection: some View {
         let apps = OpenerCatalog.candidates(extras: folders.openerExtras)
             .filter { !folders.openerHidden.contains($0.id) }
         Section {
-            if apps.count > 6 {
+            // 独立分页后不再和文件夹列表争高度：12 条以内直接摆开，
+            // 再多才滚动（一屏 12 行 ≈ 340pt，还在 13 寸屏的设置窗口高度内）。
+            if apps.count > 12 {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(apps) { app in
@@ -579,7 +637,7 @@ private struct FoldersPane: View {
                     }
                     .padding(.trailing, 14)   // 避开悬浮滚动条（同上面的列表）
                 }
-                .frame(height: 190)
+                .frame(height: 340)
             } else {
                 ForEach(apps) { app in
                     openerRow(app)
@@ -641,34 +699,6 @@ private struct FoldersPane: View {
             folders.addOpenerExtra(appPath: url.standardizedFileURL.path)
         }
     }
-
-    @ViewBuilder
-    private func folderRow(_ folder: FavoriteFolder) -> some View {
-        HStack(spacing: 8) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: folder.path))
-                .resizable()
-                .scaledToFit()
-                .frame(width: 18, height: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(folder.name)
-                    .lineLimit(1)
-                Text(folder.path)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            Spacer()
-            Button {
-                folders.remove(path: folder.path)
-            } label: {
-                Image(systemName: "trash")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.borderless)
-            .help(L10n.t("取消收藏", "Remove"))
-        }
-    }
 }
 
 // MARK: - 快捷键
@@ -685,20 +715,20 @@ private struct HotkeyPane: View {
             Section {
                 row(label: L10n.t("唤出切换器（按住修饰键循环）", "Open the switcher (hold to cycle)"),
                     target: .switcher,
-                    current: settings.switcherHotkey?.display,
-                    placeholder: L10n.t("⌃⇥（默认）", "⌃⇥ (default)"),
+                    current: settings.switcherHotkey?.displaySpaced,
+                    placeholder: "⌃ ⇥",
                     clear: { settings.switcherHotkey = nil })
 
                 row(label: L10n.t("唤出全局切换器（所有浏览器）", "Open the global switcher (all browsers)"),
                     target: .global,
-                    current: settings.globalHotkey?.display,
+                    current: settings.globalHotkey?.displaySpaced,
                     placeholder: L10n.t("同切换器键", "Same as switcher"),
                     clear: { settings.globalHotkey = nil })
                     .disabled(!settings.globalSwitcher)
 
                 row(label: L10n.t("置顶 / 取消置顶当前标签", "Pin / unpin current tab"),
                     target: .pin,
-                    current: settings.pinHotkey?.display,
+                    current: settings.pinHotkey?.displaySpaced,
                     placeholder: nil,
                     clear: { settings.pinHotkey = nil })
 
@@ -724,27 +754,44 @@ private struct HotkeyPane: View {
         .onDisappear { stopRecording() }
     }
 
-    /// placeholder 是「没设置时按钮上显示什么」，非空即表示清除后有兜底行为；
+    /// placeholder 是「没设置时胶囊里显示什么」，非空即表示清除后有兜底行为；
     /// nil 表示清除即禁用。
+    ///
+    /// 样式照 Raycast（2026-09-15 用户给的参考图）：键位是一颗贴着内容宽度的
+    /// 灰色胶囊，右边一颗圆形「恢复」钮；不再用系统 Button 拉到固定宽度。
+    /// 没设置时胶囊里用次级色写默认值，一眼能分出「这是兜底」。
     @ViewBuilder
     private func row(label: String, target: Target,
                      current: String?, placeholder: String?,
                      clear: @escaping () -> Void) -> some View {
-        HStack {
+        let isRecording = recording == target
+        HStack(spacing: 8) {
             Text(label)
             Spacer()
             Button {
-                recording == target ? stopRecording() : startRecording(target)
+                isRecording ? stopRecording() : startRecording(target)
             } label: {
-                Text(recording == target
+                Text(isRecording
                      ? L10n.t("按下快捷键…", "Press shortcut…")
-                     : (current ?? placeholder ?? L10n.t("点击录制", "Record")))
-                    .frame(minWidth: 110)
+                     : (current ?? placeholder ?? L10n.t("录制", "Record")))
+                    .font(.system(size: 13, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(current != nil || isRecording ? .primary : .secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(isRecording ? Color.accentColor.opacity(0.18)
+                                              : Color.primary.opacity(0.08))
+                    )
             }
-            if current != nil && recording != target {
+            .buttonStyle(.plain)
+            if current != nil && !isRecording {
                 Button(action: clear) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Color.primary.opacity(0.08)))
                 }
                 .buttonStyle(.plain)
                 .help(placeholder == nil ? L10n.t("清除", "Clear")
@@ -884,6 +931,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var switcherHost: NSHostingController<SwitcherPane>?
     private var tabManagementHost: NSHostingController<TabManagementPane>?
     private var foldersHost: NSHostingController<FoldersPane>?
+    private var openWithHost: NSHostingController<OpenWithPane>?
     private var browserHost: NSHostingController<BrowserPane>?
     private var hotkeyHost: NSHostingController<HotkeyPane>?
     private var aboutHost: NSHostingController<AboutPane>?
@@ -925,6 +973,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
          L10n.t("切换器", "Switcher"),
          L10n.t("标签管理", "Tabs"),
          L10n.t("文件夹管理", "Folders"),
+         L10n.t("打开方式", "Open With"),
          L10n.t("浏览器", "Browsers"),
          L10n.t("快捷键", "Shortcuts"),
          L10n.t("关于", "About")]
@@ -935,7 +984,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         generalHost?.rootView = GeneralPane(settings: settings)
         switcherHost?.rootView = SwitcherPane(settings: settings)
         tabManagementHost?.rootView = TabManagementPane(settings: settings)
-        foldersHost?.rootView = FoldersPane(folders: folders)
+        foldersHost?.rootView = FoldersPane(folders: folders, settings: settings)
+        openWithHost?.rootView = OpenWithPane(folders: folders)
         browserHost?.rootView = BrowserPane(browsers: browserStatuses)
         hotkeyHost?.rootView = HotkeyPane(settings: settings)
         aboutHost?.rootView = AboutPane(updates: updates)
@@ -953,7 +1003,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             let general = NSHostingController(rootView: GeneralPane(settings: settings))
             let switcher = NSHostingController(rootView: SwitcherPane(settings: settings))
             let tabManagement = NSHostingController(rootView: TabManagementPane(settings: settings))
-            let foldersPane = NSHostingController(rootView: FoldersPane(folders: folders))
+            let foldersPane = NSHostingController(rootView: FoldersPane(folders: folders, settings: settings))
+            let openWith = NSHostingController(rootView: OpenWithPane(folders: folders))
             let browser = NSHostingController(rootView: BrowserPane(browsers: browserStatuses))
             let hotkey = NSHostingController(rootView: HotkeyPane(settings: settings))
             let about = NSHostingController(rootView: AboutPane(updates: updates))
@@ -963,6 +1014,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             switcher.sizingOptions = [.preferredContentSize]
             tabManagement.sizingOptions = [.preferredContentSize]
             foldersPane.sizingOptions = [.preferredContentSize]
+            openWith.sizingOptions = [.preferredContentSize]
             browser.sizingOptions = [.preferredContentSize]
             hotkey.sizingOptions = [.preferredContentSize]
             about.sizingOptions = [.preferredContentSize]
@@ -970,14 +1022,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             switcherHost = switcher
             tabManagementHost = tabManagement
             foldersHost = foldersPane
+            openWithHost = openWith
             browserHost = browser
             hotkeyHost = hotkey
             aboutHost = about
 
             let tabs = NSTabViewController()
             tabs.tabStyle = .toolbar
-            let symbols = ["gearshape", "rectangle.on.rectangle.angled", "rectangle.stack", "folder", "globe", "command", "info.circle"]
-            for (index, controller) in ([general, switcher, tabManagement, foldersPane, browser, hotkey, about] as [NSViewController]).enumerated() {
+            let symbols = ["gearshape", "rectangle.on.rectangle.angled", "rectangle.stack", "folder", "arrow.up.forward.app", "globe", "command", "info.circle"]
+            for (index, controller) in ([general, switcher, tabManagement, foldersPane, openWith, browser, hotkey, about] as [NSViewController]).enumerated() {
                 let item = NSTabViewItem(viewController: controller)
                 item.label = Self.paneTitles[index]
                 item.image = NSImage(systemSymbolName: symbols[index], accessibilityDescription: nil)
