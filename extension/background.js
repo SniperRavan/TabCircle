@@ -200,8 +200,11 @@ async function currentWindowId() {
 //   · chrome:// 和 Web Store 页面截不了 → 静默失败，helper 那边降级显示 favicon
 
 const THUMB_DEBOUNCE_MS = 250;   // 等页面画完，也顺便合并连续切换
-const THUMB_WIDTH = 400;
-const THUMB_HEIGHT = 250;
+/// 缩略图长边上限。**不裁剪**，只等比缩小（见 downscale）。
+///
+/// 900 不是随手取的：helper 拿这张图当切换器浮层的折射背景（浮层要把背后那块
+/// 网页画进自己的视图树，`.glassEffect()` 才折射得到），400 放大到浮层尺寸会糊。
+const THUMB_MAX_WIDTH = 900;
 
 let thumbTimer = null;
 
@@ -222,7 +225,12 @@ async function captureThumbnail(tabId, windowId) {
     if (current?.id !== tabId) return;
 
     // 带上 url：helper 按 URL 持久化缓存，tabId 浏览器一重启就全变了
-    send({ type: "thumb", tabId, url: current.url ?? "", data: await downscale(dataUrl) });
+    // full:true = 这张图是**完整视口、未裁剪**的。helper 只拿带这个标记的图当
+    // 折射背景 —— 磁盘上还缓存着老版本按 400×250 居中裁过的图，比例和覆盖范围
+    // 都不对，拿去对齐会得到一块错位的假背景，比没有折射难看得多。
+    // 旧扩展不发这个字段，helper 读到 nil 就只当普通缩略图用，向后兼容。
+    send({ type: "thumb", tabId, url: current.url ?? "", full: true,
+           data: await downscale(dataUrl) });
   } catch (e) {
     // chrome:// 页面、窗口被遮挡、超过频率限制 —— 都是正常跳过。
     // 但错误必须让 helper 日志看得见：之前这里静默吞错，把「SW 的 fetch
@@ -231,7 +239,15 @@ async function captureThumbnail(tabId, windowId) {
   }
 }
 
-/// 原图是整个视口，直接传太大。按目标比例居中裁剪后缩到 400×250。
+/// 原图是整个视口，直接传太大，等比缩到长边 THUMB_MAX_WIDTH。
+///
+/// **绝对不能裁剪**（以前会按 400×250 居中裁）：helper 拿这张图给切换器浮层当
+/// 折射背景，它要按「浮层盖住了窗口的哪一块」去对齐裁切，而对齐的唯一依据就是
+/// 这张图**完整覆盖视口**、宽高比和视口一致。裁过的图两个前提都不成立，helper
+/// 只能放弃折射降级成模糊。
+///
+/// 卡片那边不受影响 —— SwiftUI 用 `aspectRatio(.fill)` + `clipShape` 自己裁，
+/// 观感和以前一样，只是裁剪从扩展侧挪到了渲染侧。
 async function downscale(dataUrl) {
   // 不能用 fetch(dataUrl)：MV3 service worker 的 fetch 只认 http/https，
   // 对 data: URL 直接抛异常。手动 atob 解 base64 是 SW 里的标准做法。
@@ -241,15 +257,13 @@ async function downscale(dataUrl) {
   for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
   const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/jpeg" }));
 
-  const canvas = new OffscreenCanvas(THUMB_WIDTH, THUMB_HEIGHT);
-  const ctx = canvas.getContext("2d");
+  const scale = Math.min(1, THUMB_MAX_WIDTH / bitmap.width);
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
 
-  const scale = Math.max(THUMB_WIDTH / bitmap.width, THUMB_HEIGHT / bitmap.height);
-  const srcW = THUMB_WIDTH / scale;
-  const srcH = THUMB_HEIGHT / scale;
-  // 横向居中，纵向取顶部 —— 网页的信息几乎都在上半屏
-  ctx.drawImage(bitmap, (bitmap.width - srcW) / 2, 0, srcW, srcH,
-                        0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(bitmap, 0, 0, w, h);
   bitmap.close();
 
   const out = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.6 });

@@ -82,6 +82,22 @@ final class SwitcherModel: ObservableObject {
     @Published var icons: [String: IconInfo] = [:]
     @Published var thumbs: [String: NSImage] = [:]
 
+    /// 浮层背后那块网页的画面，**已经按浮层位置裁好**，直接铺满面板。
+    ///
+    /// 存在的理由是折射：`.glassEffect()` 只对**同一个 SwiftUI 视图树里画在它
+    /// 背后**的内容做折射，窗口背后另一个进程的画面它拿不到（屏上量过：同树
+    /// 背景对比度 75.4，跨窗口 0.5，等于完全抹平）。所以想要真折射，就得把
+    /// 背后那块画面搬进视图树 —— 素材现成，就是当前标签的缩略图。
+    ///
+    /// nil = 拿不到（全局切换器浮在别的 App 上、缩略图还没攒到、chrome:// 页
+    /// 截不了）。那时退回 `NSGlassEffectView`，只有模糊没有折射。
+    @Published var backdrop: NSImage?
+
+    /// 上面那张图的**源**：当前标签完整视口的截图，未裁剪。
+    /// 由 MRUController 挑好（含「比例是否可信」的判断），浮层只负责按自己的
+    /// 位置把该显示的那块裁出来。
+    var backdropSource: NSImage?
+
     /// 游标这次是被谁移动的。决定要不要自动滚动 —— 见 SwitcherView 里的说明。
     private(set) var cursorSource: CursorSource = .keyboard
 
@@ -153,6 +169,17 @@ private let kCardSpacing: CGFloat = 8
 private let kOuterPadding: CGFloat = 12
 private let kPanelCornerRadius: CGFloat = 14
 
+/// 背板是不是系统 Liquid Glass（`NSGlassEffectView`，macOS 26+）。
+///
+/// 一个开关同时管两件事：`makeBackdrop` 用哪种背板，以及 `SwitcherView` 画不画
+/// 那套手绘外观（叠色 + hairline + 顶部高光）。两者必须同进同退 —— 手绘那套是
+/// 在 `NSVisualEffectView` 上模拟玻璃的，叠到真玻璃上只会把折射和边缘高光糊掉。
+private let kGlassBackdrop: Bool = {
+    if #available(macOS 26.0, *) { return true }
+    return false
+}()
+
+
 // 全局切换器（列表样式）的行高与分组头。列表比卡片信息密度高，
 // 跨浏览器一屏能装下的标签多得多。
 private let kListWidth: CGFloat = 520
@@ -186,12 +213,79 @@ private let kRowIconSize: CGFloat = 17
 
 // MARK: - SwiftUI 内容
 
+/// macOS 26 之前那套**手绘**玻璃：材质之上再叠色、描一道 hairline、顶部补一条
+/// 高光渐变。系统有真玻璃（`kGlassBackdrop`）时**整套关掉**，什么都不叠 ——
+/// 手绘层会切断系统联动（深浅色、「降低透明度」），而且盖在真玻璃上只会更假。
+///
+/// 手绘这套的取舍（仅在旧系统上仍然成立）：材质（`.hudWindow`）负责「透」，叠色
+/// 只负责定调。深色用低透明度的烟灰，通透感靠材质透出来；**浅色不能照抄**——
+/// 半透明面板的最终亮度由**背后的内容**主导，浅色外观浮在深色终端上时材质怎么调
+/// 都是一块中灰，代码覆盖不了。全局切换器恰恰会浮在任何 App 之上，所以浅色这层
+/// 必须够厚先把底子压白，少掉的通透是明知的代价。
+private struct HandDrawnGlass: ViewModifier {
+    let scheme: ColorScheme
+    /// 视图树里已经垫了背后那块网页（`SwitcherModel.backdrop`），玻璃该由
+    /// SwiftUI 的 `.glassEffect()` 就地画 —— 只有这样才吃得到折射。
+    /// false 时窗口那层 `NSGlassEffectView` 负责，这里什么都不做。
+    let refracting: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if refracting, #available(macOS 26.0, *) {
+            // 玻璃画在 content 背后、backdrop 之上，折射的就是那张网页。
+            content.glassEffect(.regular,
+                                in: RoundedRectangle(cornerRadius: kPanelCornerRadius,
+                                                     style: .continuous))
+        } else if kGlassBackdrop {
+            // 玻璃背板上**什么都不叠**。材质长什么样就是什么样，深浅色、
+            // 「降低透明度」这些全由系统自己联动 —— 一旦手绘一层就都断了。
+            content
+        } else {
+            content
+                .background {
+                    scheme == .dark ? Color(red: 64/255, green: 64/255, blue: 72/255).opacity(0.35)
+                                    : Color(red: 253/255, green: 252/255, blue: 251/255).opacity(0.88)
+                }
+                // 浮层边缘的 hairline。按外观分开给：浅色极淡黑描边，深色白高光边。
+                .overlay {
+                    RoundedRectangle(cornerRadius: kPanelCornerRadius, style: .continuous)
+                        .strokeBorder(scheme == .dark ? Color.white.opacity(0.16)
+                                                      : Color.black.opacity(0.08),
+                                      lineWidth: 1)
+                }
+                // 玻璃棱边：顶部一道白高光，沿边框向下渐隐。
+                .overlay {
+                    RoundedRectangle(cornerRadius: kPanelCornerRadius, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(colors: [Color.white.opacity(scheme == .dark ? 0.12 : 0.42),
+                                                    .clear],
+                                           startPoint: .top, endPoint: .bottom),
+                            lineWidth: 1)
+                }
+        }
+    }
+}
+
 private struct SwitcherView: View {
     @ObservedObject var model: SwitcherModel
     let presentation: SwitcherPresentation
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        ZStack {
+            // 底层：浮层背后那块网页。它**必须画在同一个视图树里**，
+            // `.glassEffect()` 才折射得到（见 SwitcherModel.backdrop）。
+            if let backdrop = model.backdrop {
+                Image(nsImage: backdrop)
+                    .resizable()
+                    .interpolation(.high)
+                    .allowsHitTesting(false)
+            }
+            switcherBody
+        }
+    }
+
+    private var switcherBody: some View {
         ScrollViewReader { proxy in
             content
             // 只有键盘移动游标时才自动滚动。
@@ -208,33 +302,7 @@ private struct SwitcherView: View {
                 }
             }
         }
-        // 材质（.hudWindow）负责「透」，叠色负责定调。
-        //
-        // 深色沿用低透明度的烟灰，通透感靠材质透出来。**浅色不能照抄这个思路**：
-        // 半透明面板的最终亮度由**背后的内容**主导 —— 浅色外观浮在深色终端上
-        // 时，材质怎么调都是一块中灰，代码覆盖不了（PasteMemo 那轮玻璃实验
-        // 屏上实测过）。全局切换器恰恰会浮在任何 App 之上，所以浅色这层叠色
-        // 必须够厚，先把底子压成白的；少掉的那点通透是这笔交易的代价。
-        .background {
-            scheme == .dark ? Color(red: 64/255, green: 64/255, blue: 72/255).opacity(0.35)
-                            : Color(red: 253/255, green: 252/255, blue: 251/255).opacity(0.88)
-        }
-        // 浮层边缘的 hairline。按外观分开给：浅色极淡黑描边，深色白高光边。
-        .overlay {
-            RoundedRectangle(cornerRadius: kPanelCornerRadius, style: .continuous)
-                .strokeBorder(scheme == .dark ? Color.white.opacity(0.16)
-                                              : Color.black.opacity(0.08),
-                              lineWidth: 1)
-        }
-        // 玻璃棱边：顶部一道白高光，沿边框向下渐隐。
-        .overlay {
-            RoundedRectangle(cornerRadius: kPanelCornerRadius, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(colors: [Color.white.opacity(scheme == .dark ? 0.12 : 0.42),
-                                            .clear],
-                                   startPoint: .top, endPoint: .bottom),
-                    lineWidth: 1)
-        }
+        .modifier(HandDrawnGlass(scheme: scheme, refracting: model.backdrop != nil))
     }
 
     @ViewBuilder
@@ -960,18 +1028,6 @@ final class OverlayPanel {
         guard !model.items.isEmpty else { return }
         model.allowClose = settings.allowTabClose
 
-        let effect = NSVisualEffectView()
-        // 深浅色都用 .hudWindow —— HUD 浮层专用材质,模糊重、透感强,背景色
-        // 能透进面板(系统 ⌘⇥ 切换器就是这个观感)。浅色曾用 .popover,
-        // 但它本身近乎不透明,再叠任何颜色都是铁板;「玻璃感」的前提是
-        // 材质这一层就得透,灰调只能靠上面的轻微叠色给。
-        effect.material = .hudWindow
-        effect.blendingMode = .behindWindow
-        effect.state = .active
-        // 圆角必须走 maskImage,不能用 layer.cornerRadius —— 后者裁不住
-        // vibrancy 材质,而且窗口阴影仍按直角矩形画,四角会漏出直角背景+直角阴影
-        effect.maskImage = Self.roundedMask(radius: kPanelCornerRadius)
-
         // 贴着浏览器窗口居中；全局切换器不属于任何一个浏览器窗口（前台多半
         // 根本不是浏览器），改在当前屏幕居中。
         let defaultScreen = NSScreen.main ?? NSScreen.screens[0]
@@ -993,6 +1049,14 @@ final class OverlayPanel {
         let width = contentSize.width
         let height = contentSize.height
 
+        // 折射用的背景：把浮层背后那块网页从当前标签的缩略图里裁出来。
+        //
+        // 只有浏览器内的切换器拿得到 —— 全局切换器浮在任意 App 上，那块画面我们
+        // 根本没有（也不该为了它去要屏幕录制权限，浮层定位那次已经明确拒过）。
+        let panelFrame = centeredFrame(size: NSSize(width: width, height: height))
+        model.backdrop = isGlobal ? nil : model.backdropSource
+            .flatMap { Self.cropBackdrop($0, panel: panelFrame, window: anchor) }
+
         let hosting = NSHostingView(rootView: SwitcherView(model: model, presentation: layout))
 
         let panel = NonActivatingPanel(
@@ -1013,17 +1077,31 @@ final class OverlayPanel {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.hidesOnDeactivate = false
 
-        effect.frame = NSRect(origin: .zero, size: NSSize(width: width, height: height))
-        hosting.frame = effect.bounds
+        // 外观跟着 app 设置走（`NSApp.appearance`），**不要**在这里钉死。
+        //
+        // 试过固定深色（2026-09-15），被否：系统是浅色时切换器也得是浅色，浮层跟着
+        // 系统走是用户的预期，别拿 HUD 惯例去替他决定。
+        //
+        // 代价是已知的，留在这里备查：玻璃的明暗完全由背后那块画面决定，而且**它不翻
+        // appearance**（钉死 aqua 和完全不钉，屏上量下来一模一样）。所以浅色外观浮到
+        // 深色 App 上会偏成中灰底压黑字 —— 调参救不了，`tintColor` 白 0.30 / 0.55 /
+        // 0.80 三档屏上量过，明度纹丝不动（它只偏色相）。浏览器内切换背后多是白底
+        // 网页，这一格不受影响；真碰到了再谈，别默默改回深色。
+
+        let panelSize = NSSize(width: width, height: height)
+        hosting.frame = NSRect(origin: .zero, size: panelSize)
         hosting.autoresizingMask = [.width, .height]
-        // SwiftUI 内容自己也要圆角裁剪,否则卡片会从 maskImage 的圆角处溢出
+        // SwiftUI 内容自己也要圆角裁剪,否则卡片会从背板的圆角处溢出
         hosting.wantsLayer = true
         hosting.layer?.backgroundColor = .clear
         hosting.layer?.cornerRadius = kPanelCornerRadius
         hosting.layer?.cornerCurve = .continuous
         hosting.layer?.masksToBounds = true
-        effect.addSubview(hosting)
-        panel.contentView = effect
+        // 垫了背景就走 SwiftUI `.glassEffect()` 那条路（视图树内折射），窗口这层
+        // **不能再套 NSGlassEffectView** —— 两层玻璃叠起来只会把折射再糊一遍。
+        panel.contentView = model.backdrop == nil
+            ? Self.makeBackdrop(size: panelSize, content: hosting)
+            : hosting
 
         // 先定尺寸再定位置：反过来会以近零尺寸居中,内容到位后向右下展开
         panel.setContentSize(NSSize(width: width, height: height))
@@ -1033,7 +1111,25 @@ final class OverlayPanel {
         panel.orderFrontRegardless()             // 不激活自己,焦点留在 Chrome
         // 上屏之后才有 window number，阴影参数只能这时候设（见 WindowShadow —— 它
         // 自己会等 WindowServer 把阴影初始化完，别改成一次性调用）
-        WindowShadow.applyStandardWindowShadow(to: panel)
+        //
+        // **玻璃窗口不能碰这个 SPI**（2026-09-15 真机 A/B 量出来的）：
+        // `CGSSetWindowShadowParameters` 写到 `NSGlassEffectView` 撑起来的窗口上，
+        // 会把系统阴影**整个抹掉** —— 屏上就是浮层四周完全没有投影，贴在网页上。
+        //
+        // ```
+        // 调 SPI ：背景 243 ×22 → 225(面板)          外侧纯色，0px 阴影
+        // 不调   ：253 …… 233 232 → 226 203 165 → 241 → 225   24px 阴影 + 高光
+        // ```
+        //
+        // 玻璃窗口拿系统默认阴影就是对的（不是 borderless 那档薄阴影 —— 实测 24px
+        // 渐变，比 `NSMenu` 的 8px 还厚），所以这条路什么都不用做。
+        //
+        // 别拿 demo 的结论替代真机：demo 里量出来「标准档和系统默认一模一样」，
+        // 那是因为那个进程里 SPI 实际没生效（`unavailable` 兜底），真机上它生效了，
+        // 效果正好相反。这类私有 SPI 的验证只认目标进程里的屏上结果。
+        //
+        // 旧材质那条路仍然需要它 —— 那本来就是为了把 borderless 的薄阴影提到标准档。
+        if !kGlassBackdrop { WindowShadow.applyStandardWindowShadow(to: panel) }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = fadeInDuration
             panel.animator().alphaValue = 1
@@ -1043,7 +1139,8 @@ final class OverlayPanel {
         self.hostingView = hosting
         self.shownAt = Date()
 
-        log("浮层 \(layout.describe(count: model.items.count))  \(Int(width))×\(Int(height))  上限 \(Int(maxPanelWidth))×\(Int(maxPanelHeight))")
+        let glassDesc = !kGlassBackdrop ? "材质" : (model.backdrop != nil ? "折射" : "玻璃")
+        log("浮层 \(layout.describe(count: model.items.count))  \(Int(width))×\(Int(height))  上限 \(Int(maxPanelWidth))×\(Int(maxPanelHeight))  背板 \(glassDesc)")
     }
 
     /// 把这个尺寸的面板摆到定位基准中心。presentNow 定位、applyRemoval 行数
@@ -1212,6 +1309,89 @@ final class OverlayPanel {
                                          compact: !standard.fits,
                                          grouped: true))
         }
+    }
+
+    /// 把当前标签的缩略图裁出「浮层正好盖住的那一块」，给 `.glassEffect()` 当折射源。
+    ///
+    /// 缩略图是**网页视口**的截图，而浮层贴的是**整个浏览器窗口**居中 —— 两者差一个
+    /// 浏览器自己的 UI 高度（标签栏 + 地址栏）。视口宽度就是窗口宽度，所以视口高度
+    /// 能从缩略图的宽高比反推，不必去问 AX 要：浮层唤起是热路径，跨进程调用不能进。
+    ///
+    /// 坐标系有个坑：`NSImage.draw(from:)` 的源矩形用的是**图片自己的坐标系（原点
+    /// 左下）**，和 NSScreen 一致，所以这里全程按「距底边」算，不要中途翻成左上原点。
+    ///
+    /// 返回 nil = 不垫背景（退回纯 `NSGlassEffectView`）：没有缩略图、比例异常、
+    /// 或者浮层有一部分落在视口之外（贴着窗口边或被夹到屏幕边缘时会发生）。
+    /// **宁可不垫也不能垫错** —— 错位的假背景比没有折射难看得多。
+    private static func cropBackdrop(_ thumb: NSImage, panel: NSRect, window: NSRect) -> NSImage? {
+        let ts = thumb.size
+        guard ts.width > 1, ts.height > 1, window.width > 1, window.height > 1 else { return nil }
+
+        let viewportHeight = window.width * ts.height / ts.width
+        guard viewportHeight > 1, viewportHeight <= window.height else { return nil }
+        // 视口贴窗口底边：浏览器的 UI 都在顶部
+        let viewport = NSRect(x: window.minX, y: window.minY,
+                              width: window.width, height: viewportHeight)
+
+        let u = (panel.minX - viewport.minX) / viewport.width
+        let v = (panel.minY - viewport.minY) / viewport.height
+        let w = panel.width / viewport.width
+        let h = panel.height / viewport.height
+        guard u >= 0, v >= 0, w > 0, h > 0, u + w <= 1, v + h <= 1 else { return nil }
+
+        let src = NSRect(x: u * ts.width, y: v * ts.height,
+                         width: w * ts.width, height: h * ts.height)
+        let out = NSImage(size: panel.size)
+        out.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        thumb.draw(in: NSRect(origin: .zero, size: panel.size),
+                   from: src, operation: .copy, fraction: 1)
+        out.unlockFocus()
+        return out
+    }
+
+    /// 浮层背板。macOS 26+ 用系统 Liquid Glass，旧系统退回 `NSVisualEffectView`。
+    ///
+    /// 玻璃分支是**零手绘**：不叠色、不描边、也不要 `maskImage`（`cornerRadius` 是
+    /// 一等属性，材质形状和窗口阴影形状都由它管）。`SwitcherView` 里那套手绘外观
+    /// 跟着 `kGlassBackdrop` 一起关 —— 边缘折射和高光是玻璃自己画的，手绘层叠上去
+    /// 只会把它糊掉。
+    ///
+    /// **只设 `contentView`，不要额外 `addSubview`**：头文件明说其他子视图和玻璃层
+    /// 之间的 z 序没有保证。
+    ///
+    /// 已知代价，接受：玻璃要等 WindowServer 采样背后的画面才能定明暗，`orderFront`
+    /// 返回时还没好，它会先画一版默认材质再翻（Toast 那轮屏上量过，约 400ms）。
+    /// 淡入只有 70ms，所以这一下落在淡入之后。压不住 —— 屏幕外预热、alpha 0 预热、
+    /// `tintColor` 钉色都试过，唯一有效的是砍掉全部出场动效。
+    private static func makeBackdrop(size: NSSize, content: NSView) -> NSView {
+        if #available(macOS 26.0, *), kGlassBackdrop {
+            let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
+            glass.cornerRadius = kPanelCornerRadius
+            // .regular 是定论（2026-09-15 用户拍板）：切换器是带标题和缩略图的控件
+            // 容器，Apple 把 .regular 定义给这种表面；.clear 给媒体背景上的轻量控件，
+            // 更透但白字压花背景看不清，补底又绕回 .regular 的观感。别再试 .clear。
+            glass.style = .regular
+            // 浮层是可点选、可 hover 的控件容器，头文件明说这种玻璃该开。
+            // 需要 27.0 SDK（Xcode 27）才编得过。
+            if #available(macOS 27.0, *) { glass.effectIsInteractive = true }
+            glass.contentView = content
+            return glass
+        }
+
+        let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
+        // 深浅色都用 .hudWindow —— HUD 浮层专用材质,模糊重、透感强,背景色
+        // 能透进面板(系统 ⌘⇥ 切换器就是这个观感)。浅色曾用 .popover,
+        // 但它本身近乎不透明,再叠任何颜色都是铁板;「玻璃感」的前提是
+        // 材质这一层就得透,灰调只能靠上面的轻微叠色给。
+        effect.material = .hudWindow
+        effect.blendingMode = .behindWindow
+        effect.state = .active
+        // 圆角必须走 maskImage,不能用 layer.cornerRadius —— 后者裁不住
+        // vibrancy 材质,而且窗口阴影仍按直角矩形画,四角会漏出直角背景+直角阴影
+        effect.maskImage = roundedMask(radius: kPanelCornerRadius)
+        effect.addSubview(content)
+        return effect
     }
 
     /// NSVisualEffectView 的圆角遮罩。

@@ -114,6 +114,14 @@ final class MRUController {
     /// 只存内存的话 helper 一重启就退化成一排空卡片。
     private let thumbnails = ThumbnailStore()
 
+    /// 哪些 URL 的缩略图是「完整视口、未裁剪」的（扩展发 `full: true`）。
+    ///
+    /// 只有这些图能当浮层的折射背景。磁盘缓存里还留着老版本按 400×250 居中裁过
+    /// 的图，比例和覆盖范围都对不上，拿去按位置对齐会得到一块错位的假背景。
+    /// 故意只放内存、不持久化：判据是「这张图是本次运行期间由新扩展发来的」，
+    /// 存盘反而会把上次的判断带进来。
+    private var fullViewportThumbs: Set<String> = []
+
     /// 已关闭标签的存档（状态栏子菜单末尾那一段「最近关闭」）。
     /// 落盘在 Application Support —— 浏览器重启、helper 重启都还在。
     private let closedTabs = ClosedTabStore()
@@ -326,9 +334,20 @@ final class MRUController {
         for (id, client) in clients {
             connectedByBrowser[effectiveBrowser(of: id)] = client
         }
+        // 卸载了的浏览器不再列：没连着、没置顶记录、磁盘上也找不到 ——
+        // 列出来只能是「地球图标 + 原始 bundle id」。knownBrowsers 只增不减，
+        // 这里顺手把它剔掉；重装并连上会自动回来。
+        let pinned = Set(settings.favorites.map(\.browser))
+        let gone = settings.knownBrowsers.filter {
+            connectedByBrowser[$0] == nil && !pinned.contains($0)
+                && NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) == nil
+        }
+        if !gone.isEmpty {
+            settings.knownBrowsers.removeAll(where: gone.contains)
+        }
         let known = Set(BrowserSupport.installedBrowsers())
             .union(settings.knownBrowsers)
-            .union(settings.favorites.map(\.browser))
+            .union(pinned)
             .union(connectedByBrowser.keys)
         return known.sorted().map { bundleID in
             let client = connectedByBrowser[bundleID]
@@ -521,6 +540,11 @@ final class MRUController {
                   let base64 = root["data"] as? String,
                   let data = Data(base64Encoded: base64) else { return }
             thumbnails.store(data, for: url)
+            // 只有「完整视口、未裁剪」的图能当折射背景用（见 background.js 的
+            // downscale）。磁盘缓存里混着老版本裁过的图，比例对不上，拿去对齐
+            // 会得到错位的假背景 —— 所以按 URL 记一份白名单，只认本次运行期间
+            // 收到的新图。内存里存就够：当前标签在激活时刚截过，必然在名单里。
+            if root["full"] as? Bool == true { fullViewportThumbs.insert(url) }
             refreshOverlayImages()
 
         case "tabsClosed":
@@ -1108,6 +1132,13 @@ final class MRUController {
         }
         overlay.model.icons = iconMap
         overlay.model.thumbs = thumbMap
+
+        // 折射背景的源图：当前标签（MRU 第一个）那张**完整视口**的截图。
+        // 浮层会按自己盖住了窗口的哪一块去裁它 —— 裁剪归浮层做，这里只负责
+        // 挑对源，并挡住比例不可信的老图。
+        overlay.model.backdropSource = overlay.model.items.first.flatMap { item in
+            fullViewportThumbs.contains(item.tab.url) ? thumbMap[item.id] : nil
+        }
     }
 
     // MARK: - 保活
