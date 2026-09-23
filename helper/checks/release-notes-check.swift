@@ -1,7 +1,7 @@
 // ReleaseNotes 解析的验证。
 //
 // 跑法（在 helper/ 下，需要网络）：
-//   swiftc -parse-as-library Sources/tabflick/ReleaseNotesParser.swift \
+//   swiftc -parse-as-library Sources/tabcircle/ReleaseNotesParser.swift \
 //          checks/release-notes-check.swift -o /tmp/notescheck && /tmp/notescheck
 //
 // 为什么单独验：解析的输入是**手写的 markdown**，不是结构化数据。挑错段落
@@ -22,7 +22,7 @@ let realBody = """
 - **标签存活时间新增长周期** — 增加 **1 个月 / 3 个月 / 半年 / 1 年**
 - **修复** 在浏览器关闭状态下删除置顶记录，重开浏览器后置顶会复活
 
-> 本次扩展有更新：下载下方 TabFlick-Extension.zip，替换后重新加载。首次安装见[扩展安装说明](https://www.lifedever.com/TabFlick/install-extension.html)。
+> 本次扩展有更新：下载下方 TabCircle-Extension.zip，替换后重新加载。首次安装见[扩展安装说明](https://www.sniperravan.com/TabCircle/install-extension.html)。
 
 ## What's New
 
@@ -30,15 +30,15 @@ let realBody = """
 - **Longer tab lifetimes** — you can now pick **1 month / 3 months / 6 months / 1 year**
 - **Fixed** deleting a pinned entry while its browser was closed
 
-> The extension changed in this release: download TabFlick-Extension.zip below and reload it.
+> The extension changed in this release: download TabCircle-Extension.zip below and reload it.
 
 系统要求 macOS 14+、Chromium 系浏览器 116+。Requires macOS 14+ and a Chromium-based browser 116+.
 
 ### Download
 | File | For |
 |------|-----|
-| TabFlick-0.6.0-arm64.dmg | Apple Silicon (M1/M2/M3/M4) |
-| TabFlick-Extension.zip | 浏览器扩展 / Browser extension |
+| TabCircle-0.6.0-arm64.dmg | Apple Silicon (M1/M2/M3/M4) |
+| TabCircle-Extension.zip | 浏览器扩展 / Browser extension |
 """
 
 @main

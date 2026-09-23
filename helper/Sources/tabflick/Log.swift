@@ -6,9 +6,9 @@ import Foundation
 let kLogPath: String = {
     let directory = FileManager.default
         .homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/TabFlick", isDirectory: true)
+        .appendingPathComponent("Library/Logs/TabCircle", isDirectory: true)
     try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    return directory.appendingPathComponent("tabflick.log").path
+    return directory.appendingPathComponent("tabcircle.log").path
 }()
 
 private let logFormatter: DateFormatter = {
@@ -22,7 +22,7 @@ private let logHandle: FileHandle? = {
     return FileHandle(forWritingAtPath: kLogPath)
 }()
 
-private let logQueue = DispatchQueue(label: "com.tabflick.log")
+private let logQueue = DispatchQueue(label: "com.tabcircle.log")
 
 /// 当前跑的这个二进制是什么时候编译的。
 ///

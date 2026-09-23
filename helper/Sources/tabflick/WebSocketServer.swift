@@ -17,7 +17,7 @@ import Network
 final class WebSocketServer {
 
     private let port: NWEndpoint.Port
-    private let queue = DispatchQueue(label: "com.tabflick.websocket")
+    private let queue = DispatchQueue(label: "com.tabcircle.websocket")
     private var listener: NWListener?
     private var connections: [UUID: NWConnection] = [:]
 

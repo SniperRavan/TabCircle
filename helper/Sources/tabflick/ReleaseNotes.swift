@@ -8,7 +8,7 @@ import SwiftUI
 @MainActor
 enum ReleaseNotes {
 
-    private static let repo = "lifedever/TabFlick"
+    private static let repo = "sniperravan/TabCircle"
     private static let lastRunKey = "lastRunVersion"
     /// 判断「装过老版本」用的旁证，见 shouldPresent。
     private static let everCheckedKey = "lastUpdateCheck"
@@ -176,7 +176,7 @@ enum ReleaseNotes {
 
         let w = NSWindow(contentViewController: host)
         w.styleMask = [.titled, .closable]
-        w.title = L10n.t("TabFlick 更新内容", "What's New in TabFlick")
+        w.title = L10n.t("TabCircle 更新内容", "What's New in TabCircle")
         w.isReleasedWhenClosed = false
         w.delegate = WindowWatcher.shared
         // 先把内容布局出来再居中：自适应尺寸的窗口在内容到位前 center()，

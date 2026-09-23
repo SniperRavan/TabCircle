@@ -105,7 +105,7 @@ final class ClosedTabStore {
     init() {
         let dir = FileManager.default
             .homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/TabFlick", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/TabCircle", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         file = dir.appendingPathComponent("closed-tabs.json")
         load()

@@ -1,8 +1,8 @@
 // ClosedTabStore.merging 的规则校验。
 //
 // 跑法（在 helper/ 下）：
-//   swiftc -parse-as-library Sources/tabflick/ClosedTabStore.swift \
-//          Sources/tabflick/L10n.swift Sources/tabflick/Log.swift \
+//   swiftc -parse-as-library Sources/tabcircle/ClosedTabStore.swift \
+//          Sources/tabcircle/L10n.swift Sources/tabcircle/Log.swift \
 //          checks/closed-tab-store-check.swift -o /tmp/closedcheck && /tmp/closedcheck
 //
 // 为什么单独校验：合并要同时满足四条互相交织的规则 —— 降序、同（浏览器+URL）
@@ -10,7 +10,7 @@
 // 或者旧的顶掉新的，没有任何报错。
 //
 // 只测静态纯函数 `merging`，绝不实例化 ClosedTabStore —— 那会直接读写用户
-// 真实的 ~/Library/Application Support/TabFlick/closed-tabs.json。
+// 真实的 ~/Library/Application Support/TabCircle/closed-tabs.json。
 
 import Foundation
 

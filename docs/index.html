@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TabFlick — Arc 式标签切换器 for Chrome</title>
+<title>TabCircle — Arc 式标签切换器 for Chrome</title>
 <meta name="description" content="增强 Chrome 标签体验：按最近使用顺序切换标签、标签管理、置顶常驻，带网页缩略图切换器。macOS 开源工具。">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 
-<meta property="og:title" content="TabFlick — Arc-style tab switcher for Chrome">
+<meta property="og:title" content="TabCircle — Arc-style tab switcher for Chrome">
 <meta property="og:description" content="Enhance Chrome's tab experience: MRU tab switching, tab management, and persistent pins.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://www.lifedever.com/TabFlick/">
+<meta property="og:url" content="https://www.sniperravan.com/TabCircle/">
 
 <style>
   :root {
@@ -250,14 +250,14 @@
 <header>
   <div class="header-inner">
     <a class="brand" href="#top">
-      <img src="logo.svg" alt="TabFlick">
-      <span>TabFlick</span>
+      <img src="logo.svg" alt="TabCircle">
+      <span>TabCircle</span>
     </a>
     <div class="spacer"></div>
     <a class="header-link" href="#features" data-zh="功能" data-en="Features">功能</a>
     <a class="header-link" href="#install" data-zh="安装" data-en="Install">安装</a>
-    <a class="header-link" href="https://github.com/lifedever/TabFlick" target="_blank" rel="noreferrer">GitHub</a>
-    <a class="header-link sponsor" href="https://www.lifedever.com/sponsor/" target="_blank" rel="noreferrer" data-zh="赞助" data-en="Sponsor">赞助</a>
+    <a class="header-link" href="https://github.com/sniperravan/TabCircle" target="_blank" rel="noreferrer">GitHub</a>
+    <a class="header-link sponsor" href="https://www.sniperravan.com/sponsor/" target="_blank" rel="noreferrer" data-zh="赞助" data-en="Sponsor">赞助</a>
     <button id="langToggle" type="button">EN</button>
   </div>
 </header>
@@ -265,12 +265,12 @@
 <div class="wrap" id="top">
 
   <div class="hero">
-    <img class="icon" src="logo.svg" alt="TabFlick">
+    <img class="icon" src="logo.svg" alt="TabCircle">
     <h1 data-zh="增强 Chrome 的标签体验"
         data-en="Supercharge Chrome's tabs">增强 Chrome 的标签体验</h1>
     <p class="sub"
-       data-zh="Chrome 的 ⌃⇥ 按标签栏顺序走。TabFlick 让它按你实际使用的顺序走，带网页缩略图切换器；还能自动清理闲置标签、让置顶跨重启常驻。"
-       data-en="Chrome cycles tabs in tab-strip order. TabFlick makes ⌃⇥ cycle them by recent use with a thumbnail switcher — plus idle-tab cleanup and pins that survive restarts.">Chrome 的 ⌃⇥ 按标签栏顺序走。TabFlick 让它按你实际使用的顺序走，带网页缩略图切换器；还能自动清理闲置标签、让置顶跨重启常驻。</p>
+       data-zh="Chrome 的 ⌃⇥ 按标签栏顺序走。TabCircle 让它按你实际使用的顺序走，带网页缩略图切换器；还能自动清理闲置标签、让置顶跨重启常驻。"
+       data-en="Chrome cycles tabs in tab-strip order. TabCircle makes ⌃⇥ cycle them by recent use with a thumbnail switcher — plus idle-tab cleanup and pins that survive restarts.">Chrome 的 ⌃⇥ 按标签栏顺序走。TabCircle 让它按你实际使用的顺序走，带网页缩略图切换器；还能自动清理闲置标签、让置顶跨重启常驻。</p>
 
     <div class="badges">
       <span class="badge">macOS 14+</span>
@@ -280,7 +280,7 @@
     </div>
 
     <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/lifedever/TabFlick/releases/latest" target="_blank" rel="noreferrer" data-zh="免费下载" data-en="Download">免费下载</a>
+      <a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest" target="_blank" rel="noreferrer" data-zh="免费下载" data-en="Download">免费下载</a>
       <a class="btn btn-secondary" href="#install" data-zh="安装指南" data-en="Install Guide">安装指南</a>
     </div>
   </div>
@@ -328,8 +328,8 @@
       </div>
       <div class="card">
         <h3 data-zh="置顶常驻" data-en="Pins that persist">置顶常驻</h3>
-        <p data-zh="置顶的标签由 TabFlick 记住并与 Chrome 双向同步：重启浏览器自动恢复置顶，并带回最后访问的页面。"
-           data-en="Pinned tabs are remembered and kept in two-way sync: after a Chrome restart they come back pinned, restored to the last page you visited.">置顶的标签由 TabFlick 记住并与 Chrome 双向同步：重启浏览器自动恢复置顶，并带回最后访问的页面。</p>
+        <p data-zh="置顶的标签由 TabCircle 记住并与 Chrome 双向同步：重启浏览器自动恢复置顶，并带回最后访问的页面。"
+           data-en="Pinned tabs are remembered and kept in two-way sync: after a Chrome restart they come back pinned, restored to the last page you visited.">置顶的标签由 TabCircle 记住并与 Chrome 双向同步：重启浏览器自动恢复置顶，并带回最后访问的页面。</p>
       </div>
       <div class="card">
         <h3 data-zh="菜单栏标签列表" data-en="Menu bar tab list">菜单栏标签列表</h3>
@@ -364,8 +364,8 @@
   <div class="wrap">
     <h2 data-zh="工作原理" data-en="How it works">工作原理</h2>
     <p class="lead"
-       data-zh="TabFlick 由两部分组成，通过本地回环 WebSocket 通信。"
-       data-en="TabFlick runs as two parts that talk over a loopback WebSocket.">TabFlick 由两部分组成，通过本地回环 WebSocket 通信。</p>
+       data-zh="TabCircle 由两部分组成，通过本地回环 WebSocket 通信。"
+       data-en="TabCircle runs as two parts that talk over a loopback WebSocket.">TabCircle 由两部分组成，通过本地回环 WebSocket 通信。</p>
 
 <pre class="diagram">┌─────────────────────────┐         ┌──────────────────────────┐
 │  Chrome Extension (MV3) │  ws://  │  Swift Helper            │
@@ -400,31 +400,31 @@
     <ol class="steps">
       <li>
         <h3 data-zh="下载安装" data-en="Download and install">下载安装</h3>
-        <p data-zh="从 Releases 下载 DMG，把 TabFlick.app 拖进「应用程序」。首次打开如提示「无法验证开发者」，在「应用程序」里右键 TabFlick →「打开」即可 —— 应用没有付费开发者签名，DMG 内的说明文件有详细步骤。也可以按仓库 README 从源码编译。"
-           data-en="Download the DMG from Releases and drag TabFlick.app into Applications. If the first launch says the developer cannot be verified, right-click TabFlick in Applications and choose Open — the app carries no paid Apple signature; the read-me inside the DMG covers the details. Building from source is documented in the repository README.">从 Releases 下载 DMG，把 TabFlick.app 拖进「应用程序」。首次打开如提示「无法验证开发者」，在「应用程序」里右键 TabFlick →「打开」即可 —— 应用没有付费开发者签名，DMG 内的说明文件有详细步骤。也可以按仓库 README 从源码编译。</p>
-        <a class="btn btn-primary" href="https://github.com/lifedever/TabFlick/releases/latest" target="_blank" rel="noreferrer" data-zh="下载 App" data-en="Download the App">下载 App</a>
+        <p data-zh="从 Releases 下载 DMG，把 TabCircle.app 拖进「应用程序」。首次打开如提示「无法验证开发者」，在「应用程序」里右键 TabCircle →「打开」即可 —— 应用没有付费开发者签名，DMG 内的说明文件有详细步骤。也可以按仓库 README 从源码编译。"
+           data-en="Download the DMG from Releases and drag TabCircle.app into Applications. If the first launch says the developer cannot be verified, right-click TabCircle in Applications and choose Open — the app carries no paid Apple signature; the read-me inside the DMG covers the details. Building from source is documented in the repository README.">从 Releases 下载 DMG，把 TabCircle.app 拖进「应用程序」。首次打开如提示「无法验证开发者」，在「应用程序」里右键 TabCircle →「打开」即可 —— 应用没有付费开发者签名，DMG 内的说明文件有详细步骤。也可以按仓库 README 从源码编译。</p>
+        <a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest" target="_blank" rel="noreferrer" data-zh="下载 App" data-en="Download the App">下载 App</a>
       </li>
       <li>
         <h3 data-zh="安装扩展" data-en="Install the extension">安装扩展</h3>
         <p data-zh="下载扩展包并解压，打开 chrome://extensions，右上角开启开发者模式，点「加载已解压的扩展程序」选择解压出的文件夹。扩展未上架商店，需要这一步开发者模式安装 —— 详细图文见安装说明。"
            data-en="Download and unzip the extension, open chrome://extensions, turn on Developer mode, click Load unpacked and pick the unzipped folder. The extension isn't on the Web Store, so this developer-mode step is required — the guide walks through it.">下载扩展包并解压，打开 chrome://extensions，右上角开启开发者模式，点「加载已解压的扩展程序」选择解压出的文件夹。扩展未上架商店，需要这一步开发者模式安装 —— 详细图文见安装说明。</p>
-        <a class="btn btn-primary" href="https://github.com/lifedever/TabFlick/releases/latest/download/TabFlick-Extension.zip" rel="noreferrer" data-zh="下载扩展" data-en="Download Extension">下载扩展</a>
+        <a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest/download/TabCircle-Extension.zip" rel="noreferrer" data-zh="下载扩展" data-en="Download Extension">下载扩展</a>
         <a class="btn btn-secondary" href="install-extension.html" data-zh="扩展安装说明" data-en="Install Guide">扩展安装说明</a>
       </li>
       <li>
         <h3 data-zh="授予辅助功能权限" data-en="Grant Accessibility permission">授予辅助功能权限</h3>
-        <p data-zh="首次启动会弹出引导浮层：把浮层里的 TabFlick 图标拖进「辅助功能」列表即完成授权，生效后应用自动重启。也可以手动前往 系统设置 → 隐私与安全性 → 辅助功能 打开开关。"
-           data-en="The first launch shows a guided overlay — drag the TabFlick icon from the overlay into the Accessibility list, and the app relaunches itself once the permission takes effect. You can also enable it manually under System Settings → Privacy &amp; Security → Accessibility.">首次启动会弹出引导浮层：把浮层里的 TabFlick 图标拖进「辅助功能」列表即完成授权，生效后应用自动重启。也可以手动前往 系统设置 → 隐私与安全性 → 辅助功能 打开开关。</p>
+        <p data-zh="首次启动会弹出引导浮层：把浮层里的 TabCircle 图标拖进「辅助功能」列表即完成授权，生效后应用自动重启。也可以手动前往 系统设置 → 隐私与安全性 → 辅助功能 打开开关。"
+           data-en="The first launch shows a guided overlay — drag the TabCircle icon from the overlay into the Accessibility list, and the app relaunches itself once the permission takes effect. You can also enable it manually under System Settings → Privacy &amp; Security → Accessibility.">首次启动会弹出引导浮层：把浮层里的 TabCircle 图标拖进「辅助功能」列表即完成授权，生效后应用自动重启。也可以手动前往 系统设置 → 隐私与安全性 → 辅助功能 打开开关。</p>
       </li>
       <li>
         <h3 data-zh="开始使用" data-en="Start using it">开始使用</h3>
         <p>
-          <span data-zh="菜单栏图标变亮、菜单第一行显示「已连接」，即表示两端已接上。点击 Chrome 工具栏的 TabFlick 图标可以打开设置。"
-                data-en="When the menu bar icon brightens and its first line reads Connected, both halves are talking. Click the TabFlick icon in the Chrome toolbar to open settings.">菜单栏图标变亮、菜单第一行显示「已连接」，即表示两端已接上。点击 Chrome 工具栏的 TabFlick 图标可以打开设置。</span>
+          <span data-zh="菜单栏图标变亮、菜单第一行显示「已连接」，即表示两端已接上。点击 Chrome 工具栏的 TabCircle 图标可以打开设置。"
+                data-en="When the menu bar icon brightens and its first line reads Connected, both halves are talking. Click the TabCircle icon in the Chrome toolbar to open settings.">菜单栏图标变亮、菜单第一行显示「已连接」，即表示两端已接上。点击 Chrome 工具栏的 TabCircle 图标可以打开设置。</span>
         </p>
         <div class="note">
           <span data-zh="日志文件在" data-en="The log file lives at">日志文件在</span>
-          <code class="inline">~/Library/Logs/TabFlick/tabflick.log</code>
+          <code class="inline">~/Library/Logs/TabCircle/tabcircle.log</code>
           <span data-zh="，排查问题从这里开始。" data-en="— start troubleshooting there.">，排查问题从这里开始。</span>
         </div>
       </li>
@@ -476,13 +476,13 @@
 <footer>
   <div class="wrap">
     <div class="footer-links">
-      <a href="https://github.com/lifedever/TabFlick" target="_blank" rel="noreferrer">GitHub</a>
-      <a href="https://github.com/lifedever/TabFlick/blob/main/README_zh.md" target="_blank" rel="noreferrer" data-zh="文档" data-en="Docs">文档</a>
-      <a href="https://github.com/lifedever/TabFlick/issues" target="_blank" rel="noreferrer" data-zh="反馈" data-en="Issues">反馈</a>
-      <a href="https://www.lifedever.com/sponsor/" target="_blank" rel="noreferrer" data-zh="赞助" data-en="Sponsor">赞助</a>
-      <a href="https://www.lifedever.com/" target="_blank" rel="noreferrer" data-zh="更多作品" data-en="More apps">更多作品</a>
+      <a href="https://github.com/sniperravan/TabCircle" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="https://github.com/sniperravan/TabCircle/blob/main/README_zh.md" target="_blank" rel="noreferrer" data-zh="文档" data-en="Docs">文档</a>
+      <a href="https://github.com/sniperravan/TabCircle/issues" target="_blank" rel="noreferrer" data-zh="反馈" data-en="Issues">反馈</a>
+      <a href="https://www.sniperravan.com/sponsor/" target="_blank" rel="noreferrer" data-zh="赞助" data-en="Sponsor">赞助</a>
+      <a href="https://www.sniperravan.com/" target="_blank" rel="noreferrer" data-zh="更多作品" data-en="More apps">更多作品</a>
     </div>
-    <div>MIT License · © <a href="https://github.com/lifedever" target="_blank" rel="noreferrer">lifedever</a></div>
+    <div>MIT License · © <a href="https://github.com/sniperravan" target="_blank" rel="noreferrer">sniperravan</a></div>
   </div>
 </footer>
 
@@ -491,7 +491,7 @@
   // 内容和结构在一处，改文案不用两边对照。
   // 需要混排 <strong> / <code> 的段落，拆成多个元素各自带属性，
   // 这样赋值全部走 textContent，不碰 innerHTML。
-  const KEY = "tabflick-lang";
+  const KEY = "tabcircle-lang";
   const toggle = document.getElementById("langToggle");
 
   function apply(lang) {
@@ -502,8 +502,8 @@
     }
     toggle.textContent = lang === "zh" ? "EN" : "中文";
     document.title = lang === "zh"
-      ? "TabFlick — Arc 式标签切换器 for Chrome"
-      : "TabFlick — Arc-style tab switcher for Chrome";
+      ? "TabCircle — Arc 式标签切换器 for Chrome"
+      : "TabCircle — Arc-style tab switcher for Chrome";
   }
 
   let lang = localStorage.getItem(KEY)

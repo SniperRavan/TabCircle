@@ -1,8 +1,8 @@
 // FavoriteFolderStore 纯函数的规则校验。
 //
 // 跑法（在 helper/ 下）：
-//   swiftc -parse-as-library Sources/tabflick/FavoriteFolders.swift \
-//          Sources/tabflick/L10n.swift Sources/tabflick/Log.swift \
+//   swiftc -parse-as-library Sources/tabcircle/FavoriteFolders.swift \
+//          Sources/tabcircle/L10n.swift Sources/tabcircle/Log.swift \
 //          checks/favorite-folder-check.swift -o /tmp/foldercheck && /tmp/foldercheck
 //
 // 为什么单独校验：路径标准化 + 去重写错都是**静默**的 —— 同一目录收藏出
@@ -10,7 +10,7 @@
 // 同名目录在菜单里完全无法区分。
 //
 // 只测静态纯函数，绝不实例化 FavoriteFolderStore —— 那会直接读写用户
-// 真实的 ~/Library/Application Support/TabFlick/favorite-folders.json。
+// 真实的 ~/Library/Application Support/TabCircle/favorite-folders.json。
 
 import Foundation
 

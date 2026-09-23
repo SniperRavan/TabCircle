@@ -651,7 +651,7 @@ final class MRUController {
             recordExtensionVersion(clientID, root["extVersion"] as? String ?? "0.1.0")
 
         case "openSettings":
-            // 用户点了浏览器工具栏的 TabFlick 图标
+            // 用户点了浏览器工具栏的 TabCircle 图标
             onExtensionRequestedSettings?()
 
         case "log":

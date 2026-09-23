@@ -1,7 +1,7 @@
 // GridGeometry 的穷举验证。
 //
 // 跑法（在 helper/ 下）：
-//   swiftc -parse-as-library Sources/tabflick/GridGeometry.swift \
+//   swiftc -parse-as-library Sources/tabcircle/GridGeometry.swift \
 //          checks/grid-geometry-check.swift -o /tmp/gridcheck && /tmp/gridcheck
 //
 // 思路：把布局**真的摆出来**（一行一个数组），再按「同列、上一行/下一行、

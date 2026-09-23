@@ -27,7 +27,7 @@ MainActor.assumeIsolated {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
 
-    log("tabflick started — binary built \(binaryBuildTime())")
+    log("tabcircle started — binary built \(binaryBuildTime())")
 
     // 权限要在装键盘钩子之前确认。打包成 .app 后没有终端，
     // 缺权限如果只往 stderr 打字，用户看到的就是「双击图标什么都没发生」。
@@ -115,7 +115,7 @@ MainActor.assumeIsolated {
             }
         }
         statusItem.onExtensionWarningClick = {
-            NSWorkspace.shared.open(URL(string: "https://www.lifedever.com/TabFlick/install-extension.html")!)
+            NSWorkspace.shared.open(URL(string: "https://www.sniperravan.com/TabCircle/install-extension.html")!)
         }
 
         // 两个入口通向同一个窗口：菜单栏的「设置…」和浏览器工具栏的图标
@@ -208,8 +208,8 @@ MainActor.assumeIsolated {
                         alert.messageText = L10n.t("需要「自动化」权限",
                                                    "Automation permission needed")
                         alert.informativeText = L10n.t(
-                            "收藏当前 Finder 目录需要询问 Finder 前面的窗口在看哪个文件夹。\n\n请在 系统设置 → 隐私与安全性 → 自动化 中允许 TabFlick 控制「访达」。",
-                            "To favorite the current Finder folder, TabFlick asks Finder which folder its front window shows.\n\nAllow TabFlick to control Finder under System Settings → Privacy & Security → Automation.")
+                            "收藏当前 Finder 目录需要询问 Finder 前面的窗口在看哪个文件夹。\n\n请在 系统设置 → 隐私与安全性 → 自动化 中允许 TabCircle 控制「访达」。",
+                            "To favorite the current Finder folder, TabCircle asks Finder which folder its front window shows.\n\nAllow TabCircle to control Finder under System Settings → Privacy & Security → Automation.")
                         alert.addButton(withTitle: L10n.t("打开系统设置", "Open System Settings"))
                         alert.addButton(withTitle: L10n.t("稍后", "Later"))
                         NSApp.activate(ignoringOtherApps: true)
@@ -333,7 +333,7 @@ MainActor.assumeIsolated {
                 alert.addButton(withTitle: L10n.t("稍后", "Later"))
                 NSApp.activate(ignoringOtherApps: true)
                 if alert.runModal() == .alertFirstButtonReturn {
-                    NSWorkspace.shared.open(URL(string: "https://www.lifedever.com/TabFlick/install-extension.html")!)
+                    NSWorkspace.shared.open(URL(string: "https://www.sniperravan.com/TabCircle/install-extension.html")!)
                 }
             }
         }
@@ -361,10 +361,10 @@ MainActor.assumeIsolated {
         } catch {
             log("❌ Failed to start WebSocket server: \(error)")
             fatalAlert(
-                L10n.t("TabFlick 无法启动", "TabFlick could not start"),
+                L10n.t("TabCircle 无法启动", "TabCircle could not start"),
                 L10n.t(
-                    "端口 \(kPort) 已被占用。可能已经有一个 TabFlick 在运行了 —— 看看菜单栏。",
-                    "Port \(kPort) is already in use. Another copy of TabFlick may already be running — check the menu bar."
+                    "端口 \(kPort) 已被占用。可能已经有一个 TabCircle 在运行了 —— 看看菜单栏。",
+                    "Port \(kPort) is already in use. Another copy of TabCircle may already be running — check the menu bar."
                 )
             )
         }
@@ -387,21 +387,21 @@ MainActor.assumeIsolated {
                         statusItem.render(connected: false, tabCount: 0, browserName: nil)
                         let alert = NSAlert()
                         alert.alertStyle = .warning
-                        alert.messageText = L10n.t("TabFlick 已停止拦截快捷键",
-                                                   "TabFlick stopped intercepting the shortcut")
+                        alert.messageText = L10n.t("TabCircle 已停止拦截快捷键",
+                                                   "TabCircle stopped intercepting the shortcut")
                         alert.informativeText = L10n.t(
                             """
-                            键盘钩子被系统反复禁用，为避免影响你正常打字，TabFlick 已主动停用它。
+                            键盘钩子被系统反复禁用，为避免影响你正常打字，TabCircle 已主动停用它。
                             ⌃⇥ 现在回落到 Chrome 自带的切换方式。
 
-                            重启 TabFlick 可以恢复。反复出现的话去 GitHub 反馈。
+                            重启 TabCircle 可以恢复。反复出现的话去 GitHub 反馈。
                             """,
                             """
-                            The keyboard hook was repeatedly disabled by the system, so TabFlick \
+                            The keyboard hook was repeatedly disabled by the system, so TabCircle \
                             turned it off rather than risk interfering with your typing. \
                             ⌃⇥ now falls back to Chrome's built-in switching.
 
-                            Restarting TabFlick restores it. If this keeps happening, please \
+                            Restarting TabCircle restores it. If this keeps happening, please \
                             report it on GitHub.
                             """
                         )
@@ -420,14 +420,14 @@ MainActor.assumeIsolated {
                                                    "Accessibility permission was removed")
                         alert.informativeText = L10n.t(
                             """
-                            TabFlick 已经停用键盘钩子，不影响你正常打字。⌃⇥ 回落到                             Chrome 自带的切换方式。
+                            TabCircle 已经停用键盘钩子，不影响你正常打字。⌃⇥ 回落到                             Chrome 自带的切换方式。
 
-                            重新授予权限后，需要退出并重新打开 TabFlick 才会生效 ——                             macOS 只在进程启动时读取这项权限。
+                            重新授予权限后，需要退出并重新打开 TabCircle 才会生效 ——                             macOS 只在进程启动时读取这项权限。
                             """,
                             """
-                            TabFlick disabled its keyboard hook immediately, so your typing is                             unaffected. ⌃⇥ falls back to Chrome's built-in switching.
+                            TabCircle disabled its keyboard hook immediately, so your typing is                             unaffected. ⌃⇥ falls back to Chrome's built-in switching.
 
-                            After granting the permission again, quit and reopen TabFlick —                             macOS only reads this permission when a process starts.
+                            After granting the permission again, quit and reopen TabCircle —                             macOS only reads this permission when a process starts.
                             """
                         )
                         alert.addButton(withTitle: L10n.t("好", "OK"))
@@ -440,7 +440,7 @@ MainActor.assumeIsolated {
         } catch {
             log("❌ \(error)")
             fatalAlert(
-                L10n.t("TabFlick 无法安装键盘钩子", "TabFlick could not install its keyboard hook"),
+                L10n.t("TabCircle 无法安装键盘钩子", "TabCircle could not install its keyboard hook"),
                 String(describing: error)
             )
         }

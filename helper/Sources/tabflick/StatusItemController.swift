@@ -2,7 +2,7 @@ import AppKit
 
 /// 菜单栏图标与菜单。
 ///
-/// TabFlick 是 `LSUIElement`，没有 Dock 图标也没有窗口 —— 菜单栏是它唯一
+/// TabCircle 是 `LSUIElement`，没有 Dock 图标也没有窗口 —— 菜单栏是它唯一
 /// 可见的部分，也是「它到底还活着吗」的唯一答案。所以状态行必须如实反映
 /// 扩展的连接情况，而不只是摆个图标。
 @MainActor
@@ -107,7 +107,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         buildMenu()
         if let button = statusItem.button {
             let image = NSImage(systemSymbolName: "exclamationmark.triangle.fill",
-                                accessibilityDescription: "TabFlick")
+                                accessibilityDescription: "TabCircle")
             image?.isTemplate = true
             button.image = image
             button.alphaValue = 1.0
@@ -162,14 +162,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // 菜单项图标要么全有要么全无 —— 系统会给个别标准项（如「设置」）
         // 自动配图标，其余项没有就参差不齐，所以统一显式给全。
         if unauthorized {
-            let grant = NSMenuItem(title: L10n.t("授权 TabFlick…", "Authorize TabFlick…"),
+            let grant = NSMenuItem(title: L10n.t("授权 TabCircle…", "Authorize TabCircle…"),
                                    action: #selector(requestAuthorization), keyEquivalent: "")
             grant.target = self
             grant.icon = Self.symbol("lock.shield")
             menu.addItem(grant)
             menu.addItem(.separator())
 
-            let quitOnly = NSMenuItem(title: L10n.t("退出 TabFlick", "Quit TabFlick"),
+            let quitOnly = NSMenuItem(title: L10n.t("退出 TabCircle", "Quit TabCircle"),
                                       action: #selector(quit), keyEquivalent: "q")
             quitOnly.target = self
             quitOnly.icon = Self.symbol("power")
@@ -227,7 +227,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let quit = NSMenuItem(title: L10n.t("退出 TabFlick", "Quit TabFlick"), action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(title: L10n.t("退出 TabCircle", "Quit TabCircle"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         quit.icon = Self.symbol("power")
         menu.addItem(quit)
@@ -776,7 +776,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "TabFlick"
+        image.accessibilityDescription = "TabCircle"
         return image
     }()
 

@@ -1,8 +1,8 @@
 // Toast 排版的验证。
 //
 // 跑法（在 helper/ 下）：
-//   swiftc -parse-as-library Sources/tabflick/Toast.swift \
-//          Sources/tabflick/WindowShadow.swift \
+//   swiftc -parse-as-library Sources/tabcircle/Toast.swift \
+//          Sources/tabcircle/WindowShadow.swift \
 //          checks/toast-layout-check.swift -o /tmp/toastcheck && /tmp/toastcheck
 //
 // 为什么要有这个：文字被截断**不报错也不崩**，只是少几个字。上一版把 label 的
@@ -95,14 +95,14 @@ func checkLayout() {
 
     // 用例取自真正会上屏的那几条文案（含中英两版），不是自编的等长假数据 ——
     // 「已拷贝路径」正是踩坑的那条，中文全角字符也只有真文案里才有。
-    let longPath = "/Users/someone/Documents/Dev/myspace/TabFlick/helper/Sources/tabflick"
+    let longPath = "/Users/someone/Documents/Dev/myspace/TabCircle/helper/Sources/tabcircle"
     inspect("已拷贝路径", detail: nil, kind: .success, label: "拷贝路径·无副标题")
     inspect("已拷贝路径", detail: "~/Documents/Dev", kind: .success, label: "拷贝路径·短副标题")
     inspect("已拷贝路径", detail: longPath, kind: .success, label: "拷贝路径·长路径")
     inspect("Path copied", detail: longPath, kind: .success, label: "英文·长路径")
-    inspect("已收藏「TabFlick」", detail: longPath, kind: .success, label: "收藏")
-    inspect("「TabFlick」已在收藏里，移到最前", detail: longPath, kind: .info, label: "已在收藏里")
-    inspect("已取消收藏「TabFlick」", detail: longPath, kind: .success, label: "取消收藏")
+    inspect("已收藏「TabCircle」", detail: longPath, kind: .success, label: "收藏")
+    inspect("「TabCircle」已在收藏里，移到最前", detail: longPath, kind: .info, label: "已在收藏里")
+    inspect("已取消收藏「TabCircle」", detail: longPath, kind: .success, label: "取消收藏")
     inspect("已在 Visual Studio Code 打开「my-project」", detail: longPath,
             kind: .success, label: "打开文件夹")
     inspect("打开失败",

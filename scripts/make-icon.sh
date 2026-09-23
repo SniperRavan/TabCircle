@@ -8,8 +8,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SVG="assets/appicon.svg"
-ICONSET="$(mktemp -d)/TabFlick.iconset"
-OUT="assets/TabFlick.icns"
+ICONSET="$(mktemp -d)/TabCircle.iconset"
+OUT="assets/TabCircle.icns"
 
 command -v rsvg-convert >/dev/null || {
     echo "❌ 缺少 rsvg-convert：brew install librsvg" >&2

@@ -132,7 +132,7 @@ workspace.notificationCenter.addObserver(
 print("""
 
 ╭──────────────────────────────────────────────────────────╮
-│  TabFlick — CGEventTap 可行性验证                        │
+│  TabCircle — CGEventTap 可行性验证                        │
 ╰──────────────────────────────────────────────────────────╯
 
 当前前台：\(workspace.frontmostApplication?.bundleIdentifier ?? "?")\(gFrontIsChrome ? "  ✅" : "")

@@ -205,7 +205,7 @@ private func resolveSwitchMode(code: Int64, flags: CGEventFlags) -> SwitchMode? 
               frontIsExcluded: gFrontIsExcluded)
 }
 
-private func tabflickTapCallback(proxy: CGEventTapProxy,
+private func tabcircleTapCallback(proxy: CGEventTapProxy,
                                  type: CGEventType,
                                  event: CGEvent,
                                  refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
@@ -313,13 +313,13 @@ enum EventTapError: Error, CustomStringConvertible {
                 需要「辅助功能」权限。
 
                 前往：系统设置 → 隐私与安全性 → 辅助功能，
-                打开 TabFlick（或运行它的终端应用），然后重新启动。
+                打开 TabCircle（或运行它的终端应用），然后重新启动。
                 """,
                 """
                 Accessibility permission is required.
 
                 Open: System Settings → Privacy & Security → Accessibility
-                Enable TabFlick (or the terminal app running it), then start again.
+                Enable TabCircle (or the terminal app running it), then start again.
                 """
             )
         case .tapCreationFailed:
@@ -383,7 +383,7 @@ final class EventTap {
                                           place: .headInsertEventTap,
                                           options: .defaultTap,
                                           eventsOfInterest: CGEventMask(mask),
-                                          callback: tabflickTapCallback,
+                                          callback: tabcircleTapCallback,
                                           userInfo: nil) else {
             throw EventTapError.tapCreationFailed
         }

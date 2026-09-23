@@ -1417,7 +1417,7 @@ final class OverlayPanel {
 /// 浏览器」集合（connected）—— 任何 Chromium 浏览器装上扩展、连上 helper
 /// 就自动获得支持，不靠维护名单。静态名单只是识别失败时的兜底，
 /// 用户还可以追加：
-///   defaults write com.lifedever.TabFlick extraBrowsers -array-add "<bundle id>"
+///   defaults write com.sniperravan.TabCircle extraBrowsers -array-add "<bundle id>"
 /// bundle id 用 `osascript -e 'id of app "浏览器名"'` 查询。
 @MainActor
 enum BrowserSupport {

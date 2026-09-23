@@ -1,10 +1,10 @@
 #!/bin/bash
-# 构建 TabFlick.app 并打成 DMG（arm64 / x86_64 各一个包，与 PasteMemo 同款双包模式）。
+# 构建 TabCircle.app 并打成 DMG（arm64 / x86_64 各一个包，与 PasteMemo 同款双包模式）。
 #
 #   ./scripts/build-app.sh            # 版本号取自最近的 git tag
 #   ./scripts/build-app.sh 0.2.0      # 显式指定
 #
-# 产物：build/<arch>/TabFlick.app 和 build/TabFlick-<版本>-<arch>.dmg
+# 产物：build/<arch>/TabCircle.app 和 build/TabCircle-<版本>-<arch>.dmg
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -28,7 +28,7 @@ mkdir -p "$BUILD_DIR"
 # 每次重新构建，macOS 都会把 app 当成新应用，已授予的「辅助功能」权限随即
 # 失效。改用一张固定证书后，TCC 绑定的是「证书 + bundle id」，授权一次就够。
 # 证书由 scripts/setup-dev-cert.sh 生成，仅本机有效，不能用于分发。
-DEV_CERT="TabFlick Dev"
+DEV_CERT="TabCircle Dev"
 if security find-identity -p codesigning 2>/dev/null | grep -q "$DEV_CERT"; then
     SIGN_ID="$DEV_CERT"
     echo "▸ 将使用开发证书签名（${DEV_CERT}）"
@@ -37,7 +37,7 @@ else
     echo "▸ 将使用 ad-hoc 签名（未找到开发证书，跑 scripts/setup-dev-cert.sh 可让授权稳定）"
 fi
 
-[ -f assets/TabFlick.icns ] || ./scripts/make-icon.sh
+[ -f assets/TabCircle.icns ] || ./scripts/make-icon.sh
 
 # SDK 版本必须显式喂给链接器（2026-09-15 踩）：Xcode 27 的 SwiftPM 把 SDK 路径
 # 用 `--sysroot` 传给 clang，而这版 clang 只认 `-isysroot`（或 SDKROOT）来读
@@ -50,8 +50,8 @@ SWIFT_SDK_FLAGS=(-Xswiftc -Xclang-linker -Xswiftc -isysroot -Xswiftc -Xclang-lin
 
 build_one() {
     local arch="$1"
-    local app="$BUILD_DIR/$arch/TabFlick.app"
-    local dmg="$BUILD_DIR/TabFlick-$VERSION-$arch.dmg"
+    local app="$BUILD_DIR/$arch/TabCircle.app"
+    local dmg="$BUILD_DIR/TabCircle-$VERSION-$arch.dmg"
     local stage="$BUILD_DIR/dmg-$arch"
 
     echo "▸ [$arch] 编译…"
@@ -66,12 +66,12 @@ build_one() {
     # 不能先把两个架构都编完再拷。
     local bin_dir
     bin_dir="$(cd helper && swift build -c release --arch "$arch" "${SWIFT_SDK_FLAGS[@]}" --show-bin-path)"
-    [ -f "$bin_dir/tabflick" ] || { echo "✗ [$arch] 找不到产物：$bin_dir/tabflick"; exit 1; }
+    [ -f "$bin_dir/tabcircle" ] || { echo "✗ [$arch] 找不到产物：$bin_dir/tabcircle"; exit 1; }
 
     # 防线：产物记录的 SDK 版本必须是本机 SDK，不能退化成部署目标（14.0）。
     # 这个值决定系统给不给 macOS 26+ 的外观，错了不报错、只是整个 app 长得旧。
     local linked_sdk
-    linked_sdk=$(otool -l "$bin_dir/tabflick" | awk '/LC_BUILD_VERSION/{f=1} f&&/sdk/{print $2; exit}')
+    linked_sdk=$(otool -l "$bin_dir/tabcircle" | awk '/LC_BUILD_VERSION/{f=1} f&&/sdk/{print $2; exit}')
     if [ "${linked_sdk%%.*}" -lt 26 ] 2>/dev/null || [ -z "$linked_sdk" ]; then
         echo "✗ [$arch] 产物链接的 SDK 是 ${linked_sdk:-未知}，不是本机 SDK（$(basename "$SDK_PATH")）"
         exit 1
@@ -80,7 +80,7 @@ build_one() {
     # 防线：只要还有源码比产物新，就说明这次构建没真的覆盖到，直接停。
     # 这类问题唯一的症状就是「改了没生效」，不拦住就得等上线后才发现。
     local stale_src
-    stale_src=$(find helper/Sources -name '*.swift' -newer "$bin_dir/tabflick" -print -quit)
+    stale_src=$(find helper/Sources -name '*.swift' -newer "$bin_dir/tabcircle" -print -quit)
     if [ -n "$stale_src" ]; then
         echo "✗ [$arch] 源码比产物新（$stale_src），构建没生效"
         exit 1
@@ -88,10 +88,10 @@ build_one() {
 
     echo "▸ [$arch] 组装 bundle…"
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-    cp "$bin_dir/tabflick" "$app/Contents/MacOS/TabFlick"
+    cp "$bin_dir/tabcircle" "$app/Contents/MacOS/TabCircle"
     sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" \
         packaging/Info.plist > "$app/Contents/Info.plist"
-    cp assets/TabFlick.icns "$app/Contents/Resources/TabFlick.icns"
+    cp assets/TabCircle.icns "$app/Contents/Resources/TabCircle.icns"
 
     # SPM 的 .process 资源会生成 {Package}_{Target}.bundle。必须用 glob 而
     # 不是写死名字：漏拷一个就是运行时 Bundle.module 直接 SIGTRAP，
@@ -107,10 +107,10 @@ build_one() {
 
     echo "▸ [$arch] 打包 DMG…"
     mkdir -p "$stage"
-    cp -R "$app" "$stage/TabFlick.app"
+    cp -R "$app" "$stage/TabCircle.app"
     ln -s /Applications "$stage/Applications"
     cp packaging/DMG-README.txt "$stage/请先阅读 Read Me First.txt"
-    hdiutil create -volname "TabFlick $VERSION" \
+    hdiutil create -volname "TabCircle $VERSION" \
         -srcfolder "$stage" -ov -format UDZO -quiet "$dmg"
     rm -rf "$stage"
 }
@@ -120,64 +120,64 @@ for arch in "${ARCHS[@]}"; do
 done
 
 # 扩展 zip。官网「扩展下载」固定指向
-#   releases/latest/download/TabFlick-Extension.zip
+#   releases/latest/download/TabCircle-Extension.zip
 # 资产名和 DMG 命名一样是契约：改名 = 官网链接 404。
 echo "▸ 打包扩展 zip…"
 EXT_STAGE="$BUILD_DIR/ext-stage"
 rm -rf "$EXT_STAGE"
 mkdir -p "$EXT_STAGE"
-cp -R extension "$EXT_STAGE/TabFlick-Extension"
+cp -R extension "$EXT_STAGE/TabCircle-Extension"
 # 只留 Chrome 真正会加载的东西：manifest 里没引用的开发文件（测试等）
 # 混进去，用户解压后会看到一堆不知道干嘛的东西。用**排除清单**而不是
 # 白名单拷贝 —— 新增运行时文件（新 js、新图标）时不会被悄悄漏掉。
-rm -rf "$EXT_STAGE/TabFlick-Extension/tests"
-(cd "$EXT_STAGE" && zip -qr "$BUILD_DIR/TabFlick-Extension.zip" TabFlick-Extension -x "*.DS_Store")
+rm -rf "$EXT_STAGE/TabCircle-Extension/tests"
+(cd "$EXT_STAGE" && zip -qr "$BUILD_DIR/TabCircle-Extension.zip" TabCircle-Extension -x "*.DS_Store")
 rm -rf "$EXT_STAGE"
 
 # 自检：manifest 引用的文件必须都在包里，包里不该有 manifest 之外的 .js
-missing=$(unzip -l "$BUILD_DIR/TabFlick-Extension.zip" | grep -c "manifest.json")
+missing=$(unzip -l "$BUILD_DIR/TabCircle-Extension.zip" | grep -c "manifest.json")
 [ "$missing" -eq 1 ] || { echo "❌ 扩展 zip 里没有 manifest.json"; exit 1; }
-if unzip -l "$BUILD_DIR/TabFlick-Extension.zip" | grep -qE "/(tests|checks|node_modules)/"; then
+if unzip -l "$BUILD_DIR/TabCircle-Extension.zip" | grep -qE "/(tests|checks|node_modules)/"; then
     echo "❌ 扩展 zip 混入了开发文件"; exit 1
 fi
 
 # --install：把本机架构的包直接替换 /Applications 里的版本，省掉手动拖拽
 if [[ " $* " == *" --install "* ]]; then
     NATIVE_ARCH="$(uname -m)"
-    APP="$BUILD_DIR/$NATIVE_ARCH/TabFlick.app"
+    APP="$BUILD_DIR/$NATIVE_ARCH/TabCircle.app"
     # ${} 必须写全：$VAR 后紧跟全角括号时 bash 会把多字节字符并进变量名，
     # set -u 下直接 unbound variable 中止（Coloplast 发布脚本踩过同款）
     echo "▸ 安装到 /Applications（${NATIVE_ARCH}）…"
     # 先请正在运行的实例退出，否则替换的是一个正被使用的 bundle
-    if pgrep -f "/Applications/TabFlick.app/Contents/MacOS/TabFlick" >/dev/null; then
-        osascript -e 'tell application "TabFlick" to quit' 2>/dev/null || true
+    if pgrep -f "/Applications/TabCircle.app/Contents/MacOS/TabCircle" >/dev/null; then
+        osascript -e 'tell application "TabCircle" to quit' 2>/dev/null || true
         for _ in $(seq 1 20); do
-            pgrep -f "/Applications/TabFlick.app/Contents/MacOS/TabFlick" >/dev/null || break
+            pgrep -f "/Applications/TabCircle.app/Contents/MacOS/TabCircle" >/dev/null || break
             sleep 0.25
         done
-        pkill -f "/Applications/TabFlick.app/Contents/MacOS/TabFlick" 2>/dev/null || true
+        pkill -f "/Applications/TabCircle.app/Contents/MacOS/TabCircle" 2>/dev/null || true
         sleep 0.5
     fi
     # rm 在前：cp -R 到已存在的目录是「拷进去」而不是「替换」，
     # 会把新 app 嵌套进旧 app 内部（PasteMemo beta.6 就是这么发出去的）
-    rm -rf /Applications/TabFlick.app
-    cp -R "$APP" /Applications/TabFlick.app
+    rm -rf /Applications/TabCircle.app
+    cp -R "$APP" /Applications/TabCircle.app
     # 下载来的包才有 quarantine，本地构建没有；这里防的是从 DMG 拷过来的情况
-    xattr -dr com.apple.quarantine /Applications/TabFlick.app 2>/dev/null || true
-    echo "  已安装：/Applications/TabFlick.app"
-    open -a /Applications/TabFlick.app
+    xattr -dr com.apple.quarantine /Applications/TabCircle.app 2>/dev/null || true
+    echo "  已安装：/Applications/TabCircle.app"
+    open -a /Applications/TabCircle.app
     echo "  已启动"
 fi
 
 echo
 echo "✅ 完成"
 for arch in "${ARCHS[@]}"; do
-    dmg="$BUILD_DIR/TabFlick-$VERSION-$arch.dmg"
+    dmg="$BUILD_DIR/TabCircle-$VERSION-$arch.dmg"
     echo "   $arch : $dmg ($(du -h "$dmg" | cut -f1))"
 done
 echo
 echo "验包："
 for arch in "${ARCHS[@]}"; do
-    echo "   lipo -archs '$BUILD_DIR/$arch/TabFlick.app/Contents/MacOS/TabFlick'   # 应只有 $arch"
+    echo "   lipo -archs '$BUILD_DIR/$arch/TabCircle.app/Contents/MacOS/TabCircle'   # 应只有 $arch"
 done
-echo "   defaults read '$BUILD_DIR/arm64/TabFlick.app/Contents/Info.plist' CFBundleShortVersionString"
+echo "   defaults read '$BUILD_DIR/arm64/TabCircle.app/Contents/Info.plist' CFBundleShortVersionString"

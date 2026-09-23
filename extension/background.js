@@ -1,4 +1,4 @@
-// TabFlick Bridge — MV3 service worker
+// TabCircle Bridge — MV3 service worker
 //
 // 职责：
 //   1. 维护全局标签页 MRU 顺序（最近使用的在前）
@@ -11,7 +11,7 @@
 // 这边只通过 runtime 消息收发；消息到达时 SW 会被自动唤醒。
 
 const OFFSCREEN_PATH = "offscreen.html";
-const RECONNECT_ALARM = "tabflick-reconnect";
+const RECONNECT_ALARM = "tabcircle-reconnect";
 const STORAGE_KEY = "mru";
 const META_KEY = "tabMeta";
 
@@ -462,9 +462,9 @@ async function ensureFavorites() {
 //                绝不会把窗口/浏览器整个关掉
 //   · audible —— 正在出声（后台放歌算「在用」）
 //   · 分组内的标签 —— 进了 tab group 是刻意整理过的
-// 另外只在连着 helper 时清理：TabFlick 没在运行就不该动用户的标签。
+// 另外只在连着 helper 时清理：TabCircle 没在运行就不该动用户的标签。
 
-const LIFETIME_ALARM = "tabflick-lifetime";
+const LIFETIME_ALARM = "tabcircle-lifetime";
 const LIFETIME_SWEEP_MINUTES = 5;
 
 async function sweepExpiredTabs() {
@@ -630,7 +630,7 @@ async function activateTab(tabId) {
     // 目标可能在别的窗口 —— 光设 active 不会把那个窗口提到前面
     await chrome.windows.update(tab.windowId, { focused: true });
   } catch (e) {
-    console.warn("[TabFlick] 切换失败，标签页可能已关闭:", tabId, e);
+    console.warn("[TabCircle] 切换失败，标签页可能已关闭:", tabId, e);
     await forgetTab(tabId);
   }
 }
@@ -653,12 +653,12 @@ async function ensureOffscreen() {
       // 没有哪个 reason 是为「保持 WebSocket」定义的，WORKERS 是最贴近的一项：
       // 我们确实需要一个独立于 service worker 生命周期的执行环境。
       reasons: ["WORKERS"],
-      justification: "Maintain a persistent local WebSocket connection to the TabFlick helper.",
+      justification: "Maintain a persistent local WebSocket connection to the TabCircle helper.",
     });
   } catch (e) {
     // 并发调用时可能已经被另一次创建抢先，这不是错误
     if (!String(e).includes("Only a single offscreen")) {
-      console.warn("[TabFlick] offscreen 创建失败:", e);
+      console.warn("[TabCircle] offscreen 创建失败:", e);
     }
   }
 }
@@ -764,7 +764,7 @@ chrome.runtime.onMessage.addListener((message) => {
     case "ws-open":
       if (!connected) {
         connected = true;
-        console.log("[TabFlick] 已连接 helper");
+        console.log("[TabCircle] 已连接 helper");
         // 附带扩展版本：helper 核对 major.minor 配套，不一致会提示用户更新扩展
         send({ type: "requestSettings", extVersion: chrome.runtime.getManifest().version });
         pushMRU();
@@ -775,7 +775,7 @@ chrome.runtime.onMessage.addListener((message) => {
       break;
     case "ws-close":
       connected = false;
-      console.log("[TabFlick] 连接断开");
+      console.log("[TabCircle] 连接断开");
       break;
     case "ws-message":
       helperQueue = helperQueue

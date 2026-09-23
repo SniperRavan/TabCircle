@@ -59,7 +59,7 @@ final class FavoriteFolderStore: ObservableObject {
     init() {
         let dir = FileManager.default
             .homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/TabFlick", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/TabCircle", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         file = dir.appendingPathComponent("favorite-folders.json")
         openerLastUsed = UserDefaults.standard
@@ -383,7 +383,7 @@ enum OpenerCatalog {
 /// event tap 会连续超时被系统禁用，甚至触发「键盘钩子已放弃」的误报链。
 /// 子进程在后台队列里等，主线程毫发无损。
 ///
-/// 打包后 TCC 归因走 responsible process（TabFlick 本体），
+/// 打包后 TCC 归因走 responsible process（TabCircle 本体），
 /// `packaging/Info.plist` 的 `NSAppleEventsUsageDescription` 是配套契约 ——
 /// 缺了它 macOS 直接拒绝，连授权框都不弹。`swift run` 开发时归因到终端，
 /// 弹的是终端的授权框，属正常现象。

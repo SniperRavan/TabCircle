@@ -1,4 +1,4 @@
-<h3 align="center">⌘ TabFlick</h3>
+<h3 align="center">⌘ TabCircle</h3>
 
 <p align="center">
   <strong>Supercharge Chrome's tab experience — MRU switching, tab management, and pins that persist.</strong><br>
@@ -6,14 +6,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/lifedever/TabFlick/stargazers"><img src="https://img.shields.io/github/stars/lifedever/TabFlick?style=flat-square&color=F59E0B&label=Stars" alt="Stars"></a>
+  <a href="https://github.com/sniperravan/TabCircle/stargazers"><img src="https://img.shields.io/github/stars/sniperravan/TabCircle?style=flat-square&color=F59E0B&label=Stars" alt="Stars"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/Chrome-116%2B-7C3AED?style=flat-square" alt="Chrome">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.lifedever.com/TabFlick/">🌐 <strong>Website</strong></a> ｜ <a href="#installation">🚀 <strong>Get Started</strong></a> ｜ <a href="https://www.lifedever.com/sponsor/">💖 <strong>Sponsor</strong></a>
+  <a href="https://www.sniperravan.com/TabCircle/">🌐 <strong>Website</strong></a> ｜ <a href="#installation">🚀 <strong>Get Started</strong></a> ｜ <a href="https://www.sniperravan.com/sponsor/">💖 <strong>Sponsor</strong></a>
 </p>
 
 <p align="center">
@@ -23,14 +23,14 @@
 ---
 
 <p align="center">
-  <img src="https://cdn.jsdelivr.net/gh/lifedever/images@master/uPic/2026/08/tabflick-demo-full.gif" width="860" alt="TabFlick demo">
+  <img src="https://cdn.jsdelivr.net/gh/sniperravan/images@master/uPic/2026/08/tabcircle-demo-full.gif" width="860" alt="TabCircle demo">
 </p>
 
 <p align="center">
-  <sub>Full-quality video on the <a href="https://www.lifedever.com/TabFlick/">website</a>.</sub>
+  <sub>Full-quality video on the <a href="https://www.sniperravan.com/TabCircle/">website</a>.</sub>
 </p>
 
-Chrome cycles tabs in tab-strip order. TabFlick makes ⌃⇥ cycle them by recent use and shows a switcher overlay while you hold the key, the same way ⌘⇥ works for applications.
+Chrome cycles tabs in tab-strip order. TabCircle makes ⌃⇥ cycle them by recent use and shows a switcher overlay while you hold the key, the same way ⌘⇥ works for applications.
 
 ## Features
 
@@ -46,7 +46,7 @@ Chrome cycles tabs in tab-strip order. TabFlick makes ⌃⇥ cycle them by recen
 
 ## How it works
 
-TabFlick runs as two parts that talk over a loopback WebSocket:
+TabCircle runs as two parts that talk over a loopback WebSocket:
 
 ```
 ┌─────────────────────────┐         ┌──────────────────────────┐
@@ -76,18 +76,18 @@ Both halves are required:
 
 ### Option 1 — Download the app (recommended)
 
-1. Grab the DMG for your Mac from [Releases](https://github.com/lifedever/TabFlick/releases/latest): `arm64` for Apple Silicon, `x86_64` for Intel
-2. Drag **TabFlick.app** into **Applications** and launch it — a guided overlay walks you through granting Accessibility permission
+1. Grab the DMG for your Mac from [Releases](https://github.com/sniperravan/TabCircle/releases/latest): `arm64` for Apple Silicon, `x86_64` for Intel
+2. Drag **TabCircle.app** into **Applications** and launch it — a guided overlay walks you through granting Accessibility permission
 3. Load the extension (step 3 below) — this part is always required
-4. Done. Future versions update themselves: TabFlick checks GitHub Releases on your chosen schedule and installs in place after one click
+4. Done. Future versions update themselves: TabCircle checks GitHub Releases on your chosen schedule and installs in place after one click
 
 ### Option 2 — Build from source
 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/lifedever/TabFlick.git
-cd TabFlick
+git clone https://github.com/sniperravan/TabCircle.git
+cd TabCircle
 ```
 
 ### 2. Build the helper
@@ -97,7 +97,7 @@ cd helper
 swift build -c release
 ```
 
-The binary is written to `helper/.build/release/tabflick`.
+The binary is written to `helper/.build/release/tabcircle`.
 
 > During development, `swift build` / `swift run` (debug) compile much faster.
 
@@ -115,7 +115,7 @@ The helper installs a `CGEventTap` to intercept ⌃⇥ before Chrome receives it
 Start it once:
 
 ```bash
-./.build/release/tabflick
+./.build/release/tabcircle
 ```
 
 macOS shows a permission prompt. Grant access to the app that launched the binary (Terminal, iTerm, and so on), then quit that app completely and reopen it — permissions are read at process launch.
@@ -125,13 +125,13 @@ If `CGEvent.tapCreate` still fails, enable the same app under **System Settings 
 ### 5. Run
 
 ```bash
-./.build/release/tabflick
+./.build/release/tabcircle
 ```
 
 Startup output:
 
 ```
-[HH:MM:SS.mmm] tabflick started — binary built ...
+[HH:MM:SS.mmm] tabcircle started — binary built ...
 [HH:MM:SS.mmm] WebSocket server listening → ws://127.0.0.1:41573/
 [HH:MM:SS.mmm] Keyboard hook installed — waiting for ⌃⇥ in Chrome
 [HH:MM:SS.mmm] ✅ Extension connected (1 client(s))
@@ -158,7 +158,7 @@ The overlay appears when you press ⇥ and closes when you release ⌃. A single
 
 ### Settings
 
-Open the settings window from the menu bar icon (**Settings…**, or ⌘, while a TabFlick window is focused) or by clicking the TabFlick icon in the Chrome toolbar. Changes take effect immediately — nothing needs to restart.
+Open the settings window from the menu bar icon (**Settings…**, or ⌘, while a TabCircle window is focused) or by clicking the TabCircle icon in the Chrome toolbar. Changes take effect immediately — nothing needs to restart.
 
 | Setting | Default | Effect |
 |---|---|---|
@@ -180,20 +180,20 @@ A freshly started helper has an empty first section, so the list initially match
 
 ### Thumbnails
 
-`captureVisibleTab` only captures the visible tab, so TabFlick takes a screenshot each time a tab becomes active. Every tab in the MRU list has been active at some point, so thumbnails accumulate through normal use.
+`captureVisibleTab` only captures the visible tab, so TabCircle takes a screenshot each time a tab becomes active. Every tab in the MRU list has been active at some point, so thumbnails accumulate through normal use.
 
 `chrome://` pages and the Chrome Web Store cannot be captured — Chrome blocks it. Those cards show the favicon.
 
 ## Troubleshooting
 
-Start with the helper log at `~/Library/Logs/TabFlick/tabflick.log`, which is also printed to the terminal. It is truncated on every launch, so it always describes the current run.
+Start with the helper log at `~/Library/Logs/TabCircle/tabcircle.log`, which is also printed to the terminal. It is truncated on every launch, so it always describes the current run.
 
 ### ⌃⇥ does nothing
 
 Look for `✅ Extension connected` in the log.
 
 - **Line missing** — the extension is not reaching the helper. Confirm the helper process is running and the extension is enabled in `chrome://extensions`.
-- **Line present, native switching still happens** — the connection dropped afterwards. TabFlick passes ⌃⇥ through to Chrome whenever it is disconnected, so Chrome's own switching is the expected fallback.
+- **Line present, native switching still happens** — the connection dropped afterwards. TabCircle passes ⌃⇥ through to Chrome whenever it is disconnected, so Chrome's own switching is the expected fallback.
 
 ### `CGEvent.tapCreate failed`
 
@@ -208,7 +208,7 @@ The helper does not hot-reload.
 
 ### Chrome warns about developer-mode extensions
 
-Chrome shows this notice for any unpacked extension. It does not affect TabFlick.
+Chrome shows this notice for any unpacked extension. It does not affect TabCircle.
 
 ### The overlay opens on the wrong display
 
@@ -216,8 +216,8 @@ The overlay follows the frontmost Chrome window. With windows on several display
 
 ## Sponsor
 
-TabFlick is free and open source. If you find it useful, you can [sponsor its development](https://www.lifedever.com/sponsor/) 💖
+TabCircle is free and open source. If you find it useful, you can [sponsor its development](https://www.sniperravan.com/sponsor/) 💖
 
 ## License
 
-[MIT](./LICENSE) © [lifedever](https://github.com/lifedever)
+[MIT](./LICENSE) © [sniperravan](https://github.com/sniperravan)

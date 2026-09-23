@@ -1,9 +1,9 @@
 // 「更新内容」窗口该不该弹的启动决策验证。
 //
 // 跑法（在 helper/ 下）：
-//   swiftc -parse-as-library Sources/tabflick/ReleaseNotes.swift \
-//          Sources/tabflick/ReleaseNotesParser.swift \
-//          Sources/tabflick/L10n.swift Sources/tabflick/Log.swift \
+//   swiftc -parse-as-library Sources/tabcircle/ReleaseNotes.swift \
+//          Sources/tabcircle/ReleaseNotesParser.swift \
+//          Sources/tabcircle/L10n.swift Sources/tabcircle/Log.swift \
 //          checks/release-notes-decision-check.swift -o /tmp/notesdecide && /tmp/notesdecide
 //
 // 为什么要有这个：这几条分支错了**都不报错**，只会「该弹的不弹」或者「弹了一个

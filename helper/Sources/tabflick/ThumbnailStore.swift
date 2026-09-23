@@ -24,7 +24,7 @@ final class ThumbnailStore {
     init() {
         directory = FileManager.default
             .homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Caches/TabFlick/thumbnails", isDirectory: true)
+            .appendingPathComponent("Library/Caches/TabCircle/thumbnails", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 

@@ -62,7 +62,7 @@ final class PermissionCoordinator {
             suggestedAppURLs: [Bundle.main.bundleURL],
             sourceFrameInScreen: sourceFrame,
             panelHint: L10n.t("把图标拖到「辅助功能」列表里", "Drag this icon into the Accessibility list"),
-            panelTitle: L10n.t("授权 TabFlick", "Authorize TabFlick")
+            panelTitle: L10n.t("授权 TabCircle", "Authorize TabCircle")
         )
     }
 

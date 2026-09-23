@@ -1,4 +1,4 @@
-// TabFlick — offscreen document
+// TabCircle — offscreen document
 //
 // 只做一件事：维持到 helper 的 WebSocket 连接，并在它和 service worker 之间
 // 转发消息。
@@ -26,7 +26,7 @@ let retryTimer = null;
 
 // 诊断探针 + 降噪：夸克等分支浏览器会把未捕获的 promise 拒绝渲染成扩展
 // 错误卡片，且归因粗糙（offscreen.html:0 匿名函数），从卡片上根本看不出
-// 元凶。这里统一截获：完整堆栈经 WebSocket 写进 helper 日志（tabflick.log
+// 元凶。这里统一截获：完整堆栈经 WebSocket 写进 helper 日志（tabcircle.log
 // 里搜 "offscreen unhandled"），并 preventDefault 阻止浏览器再弹卡片。
 self.addEventListener("unhandledrejection", (event) => {
   event.preventDefault();

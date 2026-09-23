@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "TabFlick Bridge",
+  "name": "TabCircle Bridge",
   "version": "0.14.0",
-  "description": "把标签页的 MRU 顺序桥接给 TabFlick helper，并执行切换指令。",
+  "description": "Bridges the MRU tab order to the TabCircle helper and executes switch commands.",
   "permissions": [
     "tabs",
     "storage",
@@ -17,7 +17,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "TabFlick — click for settings",
+    "default_title": "TabCircle — click for settings",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"

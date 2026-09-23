@@ -284,10 +284,10 @@ private struct BrowserPane: View {
 
                 HStack(spacing: 12) {
                     Button(L10n.t("下载扩展", "Download Extension")) {
-                        NSWorkspace.shared.open(URL(string: "https://github.com/lifedever/TabFlick/releases/latest/download/TabFlick-Extension.zip")!)
+                        NSWorkspace.shared.open(URL(string: "https://github.com/sniperravan/TabCircle/releases/latest/download/TabCircle-Extension.zip")!)
                     }
                     Link(L10n.t("安装说明", "Install Guide"),
-                         destination: URL(string: "https://www.lifedever.com/TabFlick/install-extension.html")!)
+                         destination: URL(string: "https://www.sniperravan.com/TabCircle/install-extension.html")!)
                         .font(.system(size: 11))
                 }
             }
@@ -844,7 +844,7 @@ private struct AboutPane: View {
                 .frame(width: 72, height: 72)
 
             VStack(spacing: 3) {
-                Text("TabFlick").font(.system(size: 16, weight: .semibold))
+                Text("TabCircle").font(.system(size: 16, weight: .semibold))
                 Text(L10n.t("版本 \(updates.currentVersion)", "Version \(updates.currentVersion)"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -880,7 +880,7 @@ private struct AboutPane: View {
                 .disabled(updates.status == .checking || updates.isDownloading)
 
                 Button {
-                    NSWorkspace.shared.open(URL(string: "https://www.lifedever.com/sponsor/")!)
+                    NSWorkspace.shared.open(URL(string: "https://www.sniperravan.com/sponsor/")!)
                 } label: {
                     Label(L10n.t("赞助开发", "Sponsor"), systemImage: "heart.fill")
                 }
@@ -888,15 +888,15 @@ private struct AboutPane: View {
 
             HStack(spacing: 16) {
                 Link(L10n.t("官网", "Website"),
-                     destination: URL(string: "https://www.lifedever.com/TabFlick/")!)
+                     destination: URL(string: "https://www.sniperravan.com/TabCircle/")!)
                 Link("GitHub",
-                     destination: URL(string: "https://github.com/lifedever/TabFlick")!)
+                     destination: URL(string: "https://github.com/sniperravan/TabCircle")!)
                 Link(L10n.t("反馈问题", "Report an Issue"),
-                     destination: URL(string: "https://github.com/lifedever/TabFlick/issues")!)
+                     destination: URL(string: "https://github.com/sniperravan/TabCircle/issues")!)
             }
             .font(.system(size: 11))
 
-            Text("MIT License © lifedever")
+            Text("MIT License © sniperravan")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
         }

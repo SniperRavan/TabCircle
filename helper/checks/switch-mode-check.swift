@@ -1,7 +1,7 @@
 // SwitcherHotkeys.mode 的判定表验证。
 //
 // 跑法（在 helper/ 下）：
-//   swiftc -parse-as-library Sources/tabflick/SwitchMode.swift \
+//   swiftc -parse-as-library Sources/tabcircle/SwitchMode.swift \
 //          checks/switch-mode-check.swift -o /tmp/switchmodecheck && /tmp/switchmodecheck
 //
 // 判定表 16 格（切换器键命不命中 × 全局键命不命中 × 前台是不是浏览器 ×

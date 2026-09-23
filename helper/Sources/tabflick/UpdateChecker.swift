@@ -14,7 +14,7 @@ import SwiftUI
 @MainActor
 final class UpdateChecker: ObservableObject {
 
-    private static let repo = "lifedever/TabFlick"
+    private static let repo = "sniperravan/TabCircle"
     static var releasesPage: URL { URL(string: "https://github.com/\(repo)/releases/latest")! }
 
     private static let lastCheckKey = "lastUpdateCheck"
@@ -137,7 +137,7 @@ final class UpdateChecker: ObservableObject {
             }
             let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
 
-            // 找当前架构的 DMG。资产名形如 TabFlick-0.2.0-arm64.dmg
+            // 找当前架构的 DMG。资产名形如 TabCircle-0.2.0-arm64.dmg
             #if arch(arm64)
             let arch = "arm64"
             #else
@@ -233,7 +233,7 @@ final class UpdateChecker: ObservableObject {
             presentInstallFailure(L10n.t("更新包无法打开", "The update image could not be opened"))
             return
         }
-        let sourceApp = "\(mountPoint)/TabFlick.app"
+        let sourceApp = "\(mountPoint)/TabCircle.app"
         guard FileManager.default.fileExists(atPath: sourceApp) else {
             Self.detachDMG(mountPoint)
             presentInstallFailure(L10n.t("更新包内容不完整", "The update image is missing the app"))
@@ -264,7 +264,7 @@ final class UpdateChecker: ObservableObject {
         """
 
         do {
-            let scriptPath = NSTemporaryDirectory() + "tabflick_update.sh"
+            let scriptPath = NSTemporaryDirectory() + "tabcircle_update.sh"
             try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -372,7 +372,7 @@ final class UpdateChecker: ObservableObject {
         activate()
         let alert = NSAlert()
         alert.messageText = L10n.t("已是最新版本", "You're up to date")
-        alert.informativeText = L10n.t("当前版本 \(currentVersion)。", "TabFlick \(currentVersion) is the latest version.")
+        alert.informativeText = L10n.t("当前版本 \(currentVersion)。", "TabCircle \(currentVersion) is the latest version.")
         alert.addButton(withTitle: L10n.t("好", "OK"))
         alert.runModal()
     }
@@ -411,8 +411,8 @@ private struct DownloadProgressView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.t("正在下载 TabFlick \(updates.pendingVersion)…",
-                        "Downloading TabFlick \(updates.pendingVersion)…"))
+            Text(L10n.t("正在下载 TabCircle \(updates.pendingVersion)…",
+                        "Downloading TabCircle \(updates.pendingVersion)…"))
                 .font(.system(size: 13, weight: .medium))
             ProgressView(value: updates.downloadProgress)
                 .frame(width: 280)
@@ -459,7 +459,7 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
                     didFinishDownloadingTo location: URL) {
-        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("TabFlick-update.dmg")
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("TabCircle-update.dmg")
         try? FileManager.default.removeItem(at: dest)
 
         // location 是系统临时文件，回调返回后立即被删，必须先挪走

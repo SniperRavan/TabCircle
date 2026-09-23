@@ -2,16 +2,16 @@
 //
 // 浮层生命周期探针。
 //
-// 每 200ms 扫一次窗口服务器，记录 TabFlick 名下所有窗口的位置/透明度/层级，
+// 每 200ms 扫一次窗口服务器，记录 TabCircle 名下所有窗口的位置/透明度/层级，
 // 以及当前前台应用。用来回答「浮层到底是没出现、飞出屏幕，还是出现后被隐藏」。
 //
 // 用法：swift scripts/probe-panel.swift  然后在 15 秒内点「前往授权」
-// 输出：/tmp/tabflick-panel-probe.log
+// 输出：/tmp/tabcircle-panel-probe.log
 //
 
 import Cocoa
 
-let logPath = "/tmp/tabflick-panel-probe.log"
+let logPath = "/tmp/tabcircle-panel-probe.log"
 FileManager.default.createFile(atPath: logPath, contents: nil)
 let handle = FileHandle(forWritingAtPath: logPath)!
 
@@ -45,7 +45,7 @@ let timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { timer i
     // 一个窗口 orderOut 之后会直接从列表消失 —— 这正是我们要区分的关键。
     var rows: [String] = []
     for entry in list {
-        guard let owner = entry[kCGWindowOwnerName as String] as? String, owner == "TabFlick" else { continue }
+        guard let owner = entry[kCGWindowOwnerName as String] as? String, owner == "TabCircle" else { continue }
         let name = (entry[kCGWindowName as String] as? String) ?? ""
         let layer = (entry[kCGWindowLayer as String] as? NSNumber)?.intValue ?? -999
         let alpha = (entry[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? -1
@@ -61,7 +61,7 @@ let timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { timer i
     // 只在状态变化时输出，避免刷屏
     let signature = frontmost + "|" + rows.joined()
     if signature != lastSignature {
-        emit("frontmost=\(frontmost)  TabFlick 窗口数=\(rows.count)")
+        emit("frontmost=\(frontmost)  TabCircle 窗口数=\(rows.count)")
         rows.forEach { emit($0) }
         lastSignature = signature
     }

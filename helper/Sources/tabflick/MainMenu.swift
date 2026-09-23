@@ -2,7 +2,7 @@ import AppKit
 
 /// 主菜单。
 ///
-/// TabFlick 是 accessory app，平时不显示菜单栏，但 ⌘W / ⌘Q / ⌘, 这些标准
+/// TabCircle 是 accessory app，平时不显示菜单栏，但 ⌘W / ⌘Q / ⌘, 这些标准
 /// 快捷键全靠 `NSApp.mainMenu` 的 key equivalent 路由 —— 没有主菜单，设置
 /// 窗口对 ⌘W 就毫无反应。另外设置窗口打开期间 app 会临时切成 `.regular`，
 /// 菜单栏是真的会显示出来的，所以内容也要像样：
@@ -41,7 +41,7 @@ enum MainMenu {
             appMenu.addItem(settings)
             appMenu.addItem(.separator())
         }
-        appMenu.addItem(NSMenuItem(title: L10n.t("退出 TabFlick", "Quit TabFlick"),
+        appMenu.addItem(NSMenuItem(title: L10n.t("退出 TabCircle", "Quit TabCircle"),
                                    action: #selector(NSApplication.terminate(_:)),
                                    keyEquivalent: "q"))
         let appItem = NSMenuItem()

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 生成一张本地自签名代码签名证书，供开发期签 TabFlick.app 用。
+# 生成一张本地自签名代码签名证书，供开发期签 TabCircle.app 用。
 #
 # 解决的问题：ad-hoc 签名（codesign --sign -）的 TCC 记录绑定 cdhash，
 # 而 cdhash 随代码变化。于是每次重新构建，macOS 都把 app 当成一个新应用，
@@ -11,7 +11,7 @@
 # 注意：这张证书只对本机有效，不能用于分发。分发仍需 Apple Developer ID。
 set -euo pipefail
 
-CERT_NAME="TabFlick Dev"
+CERT_NAME="TabCircle Dev"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 
 if security find-identity -p codesigning 2>/dev/null | grep -q "$CERT_NAME"; then
@@ -30,7 +30,7 @@ x509_extensions = v3
 prompt = no
 
 [dn]
-CN = TabFlick Dev
+CN = TabCircle Dev
 
 [v3]
 basicConstraints = critical, CA:false
