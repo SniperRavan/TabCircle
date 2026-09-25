@@ -4,7 +4,7 @@
     {
       "identity" : "permissionflow",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/sniperravan/PermissionFlow.git",
+      "location" : "https://github.com/lifedever/PermissionFlow.git",
       "state" : {
         "revision" : "dd7b3342241232853d123b9fe29eaccbd0665c6a",
         "version" : "0.1.2"

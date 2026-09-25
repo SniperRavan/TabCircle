@@ -7,7 +7,7 @@ let package = Package(
     dependencies: [
         // Permission guide overlay: drag the app icon into the Accessibility list to authorize.
         // Pinned by SemVer tag, not branch/revision.
-        .package(url: "https://github.com/sniperravan/PermissionFlow.git", from: "0.1.0"),
+        .package(url: "https://github.com/lifedever/PermissionFlow.git", from: "0.1.0"),
     ],
     targets: [
         .executableTarget(
