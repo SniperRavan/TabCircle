@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "إذن الحماية";
+"permission_flow.drag.description" = "اسحب هذا التطبيق إلى قائمة التفويض في إعدادات النظام.";
+"permission_flow.drag.label" = "سحب";
+"permission_flow.button.grant" = "منح";

@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "Разрешение песочницы";
+"permission_flow.drag.description" = "Перетащите это приложение в список разрешений в «Системных настройках».";
+"permission_flow.drag.label" = "Перетащить";
+"permission_flow.button.grant" = "Разрешить";

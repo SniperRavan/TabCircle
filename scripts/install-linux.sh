@@ -174,11 +174,12 @@ else
     fi
 
     # Try apt on Debian/Ubuntu/Mint first to avoid PEP 668 errors
-    if command -v apt-get >/dev/null 2>&1 && [ -w /var/lib/dpkg/lock-frontend 2>/dev/null ]; then
+    if command -v apt-get >/dev/null 2>&1 && [ -w /var/lib/dpkg/lock-frontend ]; then
         apt-get install -y python3-pyqt6 python3-xlib python3-websockets || true
     elif command -v sudo >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
         echo "Installing system packages via apt..."
-        sudo apt-get update -qq && sudo apt-get install -y -qq python3-pyqt6 python3-xlib python3-websockets || true
+        sudo apt-get update -qq || true
+        sudo apt-get install -y -qq python3-pyqt6 python3-xlib python3-websockets || true
     fi
 
     # If still not satisfied, attempt user pip with break-system-packages fallback

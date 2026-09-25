@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "Permissão da sandbox";
+"permission_flow.drag.description" = "Arraste este app para a lista de autorização dos Ajustes do Sistema.";
+"permission_flow.drag.label" = "Arrastar";
+"permission_flow.button.grant" = "Conceder";

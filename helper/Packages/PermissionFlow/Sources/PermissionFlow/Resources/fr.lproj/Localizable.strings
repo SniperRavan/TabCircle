@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "Autorisation du bac à sable";
+"permission_flow.drag.description" = "Faites glisser cette app dans la liste d’autorisation des Réglages Système.";
+"permission_flow.drag.label" = "Glisser";
+"permission_flow.button.grant" = "Autoriser";

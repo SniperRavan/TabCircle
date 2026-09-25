@@ -5,9 +5,8 @@ let package = Package(
     name: "tabcircle",
     platforms: [.macOS(.v14)],
     dependencies: [
-        // Permission guide overlay: drag the app icon into the Accessibility list to authorize.
-        // Pinned by SemVer tag, not branch/revision.
-        .package(url: "https://github.com/lifedever/PermissionFlow.git", from: "0.1.0"),
+        // Permission guide overlay: vendored locally with Swift 6.0 compatibility
+        .package(path: "Packages/PermissionFlow"),
     ],
     targets: [
         .executableTarget(

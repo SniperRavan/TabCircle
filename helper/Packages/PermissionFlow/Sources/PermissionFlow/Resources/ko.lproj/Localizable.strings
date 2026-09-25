@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "샌드박스 권한";
+"permission_flow.drag.description" = "이 앱을 시스템 설정의 권한 목록으로 드래그하세요.";
+"permission_flow.drag.label" = "드래그";
+"permission_flow.button.grant" = "허용";

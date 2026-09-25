@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "サンドボックス権限";
+"permission_flow.drag.description" = "このアプリを「システム設定」の認可リストにドラッグしてください。";
+"permission_flow.drag.label" = "ドラッグ";
+"permission_flow.button.grant" = "許可";

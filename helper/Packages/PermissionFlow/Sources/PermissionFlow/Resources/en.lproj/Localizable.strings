@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "Sandbox Permission";
+"permission_flow.drag.description" = "Drag this app into the System Settings authorization list.";
+"permission_flow.drag.label" = "Drag";
+"permission_flow.button.grant" = "Grant";

@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "Sandbox-Berechtigung";
+"permission_flow.drag.description" = "Ziehe diese App in die Autorisierungsliste der Systemeinstellungen.";
+"permission_flow.drag.label" = "Ziehen";
+"permission_flow.button.grant" = "Erlauben";

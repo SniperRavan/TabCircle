@@ -1,0 +1,4 @@
+"permission_flow.panel.title" = "沙盒权限";
+"permission_flow.drag.description" = "将此应用拖入“系统设置”中的授权列表。";
+"permission_flow.drag.label" = "拖拽";
+"permission_flow.button.grant" = "授权";

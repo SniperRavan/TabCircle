@@ -1,0 +1,419 @@
+<div align="left">
+  <sup>Using <a href="https://wangchujiang.com/#/app" target="_blank">my app</a> is also a way to <a href="https://wangchujiang.com/#/sponsor" target="_blank">support</a> me:</sup>
+  <br>
+  <a target="_blank" href="https://apps.apple.com/app/6758053530" title="Scap: Screenshot & Markup Edit for macOS"><img alt="Scap: Screenshot & Markup Edit" height="52" src="https://wangchujiang.com/appicon/scap.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6757317079" title="Screen Test for macOS"><img alt="Screen Test" height="52" src="https://wangchujiang.com/appicon/screen-test.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/Deskmark/6755948110" title="Deskmark for macOS"><img alt="Deskmark" height="52" src="https://wangchujiang.com/appicon/deskmark.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/Keyzer/6500434773" title="Keyzer for macOS"><img alt="Keyzer" height="52" src="https://wangchujiang.com/appicon/keyzer.png"></a>
+  <a target="_blank" href="https://github.com/jaywcjlove/vidwall-hub" title="Vidwall Hub for macOS"><img alt="Vidwall Hub" height="52" src="https://wangchujiang.com/appicon/vidwall-hub.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/VidCrop/6752624705" title="VidCrop for macOS"><img alt="VidCrop" height="52" src="https://wangchujiang.com/appicon/vidcrop.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/Vidwall/6747587746" title="Vidwall for macOS"><img alt="Vidwall" height="52" src="https://wangchujiang.com/appicon/vidwall.png"></a>
+  <a target="_blank" href="https://wangchujiang.com/mousio-hint/" title="Mousio Hint for macOS"><img alt="Mousio Hint" height="52" src="https://wangchujiang.com/appicon/mousio-hint.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6746747327" title="Mousio for macOS"><img alt="Mousio" height="52" src="https://wangchujiang.com/appicon/mousio.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6745227444" title="Musicer for macOS"><img alt="Musicer" height="52" src="https://wangchujiang.com/appicon/musicer.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6743841447" title="Audioer for macOS"><img alt="Audioer" height="52" src="https://wangchujiang.com/appicon/audioer.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6744690194" title="FileSentinel for macOS"><img alt="FileSentinel" height="52" src="https://wangchujiang.com/appicon/file-sentinel.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6743495172" title="FocusCursor for macOS"><img alt="FocusCursor" height="52" src="https://wangchujiang.com/appicon/focus-cursor.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6742680573" title="Videoer for macOS"><img alt="Videoer" height="52" src="https://wangchujiang.com/appicon/videoer.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6740425504" title="KeyClicker for macOS"><img alt="KeyClicker" height="52" src="https://wangchujiang.com/appicon/key-clicker.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6739052447" title="DayBar for macOS"><img alt="DayBar" height="52" src="https://wangchujiang.com/appicon/daybar.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6739444407" title="Iconed for macOS"><img alt="Iconed" height="52" src="https://wangchujiang.com/appicon/iconed.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6737160756" title="Menuist for macOS"><img alt="Menuist" height="52" src="https://wangchujiang.com/appicon/rightmenu-master.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6723903021" title="Paste Quick for macOS"><img alt="Quick RSS" height="52" src="https://wangchujiang.com/appicon/paste-quick.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6670696072?platform=mac" title="Quick RSS for macOS/iOS"><img alt="Quick RSS" height="52" src="https://wangchujiang.com/appicon/quick-rss.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6670167443" title="Web Serve for macOS"><img alt="Web Serve" height="52" src="https://wangchujiang.com/appicon/web-serve.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6503953628?platform=mac" title="Copybook Generator for macOS/iOS"><img alt="Copybook Generator" height="52" src="https://wangchujiang.com/appicon/copybook-generator.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6471227008?platform=mac" title="DevTutor for macOS/iOS"><img alt="DevTutor for SwiftUI" height="52" src="https://wangchujiang.com/appicon/devtutor.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6479819388?platform=mac" title="RegexMate for macOS/iOS"><img alt="RegexMate" height="52" src="https://wangchujiang.com/appicon/regex-mate.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6479194014?platform=mac" title="Time Passage for macOS/iOS"><img alt="Time Passage" height="52" src="https://wangchujiang.com/appicon/time-passage.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6478772538" title="IconizeFolder for macOS"><img alt="Iconize Folder" height="52" src="https://wangchujiang.com/appicon/iconize-folder.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6478511402?platform=mac" title="Textsound Saver for macOS/iOS"><img alt="Textsound Saver" height="52" src="https://wangchujiang.com/appicon/textsound-saver.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6476924627" title="Create Custom Symbols for macOS"><img alt="Create Custom Symbols" height="52" src="https://wangchujiang.com/appicon/create-custom-symbols.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6476452351" title="DevHub for macOS"><img alt="DevHub" height="52" src="https://wangchujiang.com/appicon/devhub.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6476400184" title="Resume Revise for macOS"><img alt="Resume Revise" height="52" src="https://wangchujiang.com/appicon/resume-revise.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6472593276" title="Palette Genius for macOS"><img alt="Palette Genius" height="52" src="https://wangchujiang.com/appicon/palette-genius.png"></a>
+  <a target="_blank" href="https://apps.apple.com/app/6470879005" title="Symbol Scribe for macOS"><img alt="Symbol Scribe" height="52" src="https://wangchujiang.com/appicon/symbol-scribe.png"></a>
+</div>
+<hr>
+
+[中文](./README.zh.md) • [Installation](#installation) • [Public API](#public-api) • [System Settings URL Scheme](#system-settings-url-scheme)
+
+<hr>
+
+PermissionFlow
+===
+
+<img alt="PermissionFlow" src="https://github.com/user-attachments/assets/906a643d-07e5-4889-85f4-858f2b03de07" />
+
+`PermissionFlow` is a Swift Package for Apple platform apps that bundles two focused libraries:
+
+- `PermissionFlow`: macOS-only floating guidance for drag-based privacy authorization
+- `SystemSettingsKit`: typed Settings deeplinks for macOS, with partial iOS support
+
+It opens the correct privacy page automatically and, for panes that support drag-based authorization, shows a floating helper panel that follows the `System Settings` window and lets the user drag the current `.app` bundle into the permission list.
+
+
+## Features
+
+- Opens the target `System Settings` privacy pane automatically
+- Animates the floating panel from the click position to the `System Settings` window
+- Follows the `System Settings` window while it moves
+- Shows the current app as a native drag source
+- Keeps only one active floating panel at a time
+- Closes the floating panel automatically when `System Settings` closes
+- Supports adaptive floating panel height based on content
+
+## Requirements
+
+- macOS 13+
+- Swift 6 package toolchain
+- SwiftUI + AppKit host application
+
+## Installation
+
+Add the package to your app:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/lifedever/PermissionFlow.git", from: "0.1.0")
+]
+```
+
+This package now exposes two library products:
+
+- `PermissionFlow`: floating authorization guidance for supported privacy panes on macOS
+- `SystemSettingsKit`: reusable deeplink API for arbitrary System Settings pages
+
+Then add the product you need to your target:
+
+```swift
+.target(
+    name: "YourApp",
+    dependencies: [
+        .product(name: "PermissionFlow", package: "PermissionFlow"),
+        .product(name: "SystemSettingsKit", package: "PermissionFlow")
+    ]
+)
+```
+
+Platform support:
+
+- `PermissionFlow`: `macOS 13+`
+- `SystemSettingsKit`: `macOS 13+`, `iOS 16+`
+
+`SystemSettingsKit` is intentionally partial on iOS. The macOS deeplink-based pane and anchor APIs remain macOS-only, while iOS only exposes destinations that are publicly supported by UIKit, such as the current app's Settings page.
+
+## Supported Permission Panes
+
+`PermissionFlow` only covers these 8 privacy panes that support the floating drag-and-drop authorization workflow:
+
+- `.appManagement`: Opens `Privacy & Security > App Management`.
+- `.accessibility`: Opens `Privacy & Security > Accessibility`.
+- `.bluetooth`: Opens `Privacy & Security > Bluetooth`.
+- `.developerTools`: Opens `Privacy & Security > Developer Tools`.
+- `.fullDiskAccess`: Opens `Privacy & Security > Full Disk Access`.
+- `.inputMonitoring`: Opens `Privacy & Security > Input Monitoring`.
+- `.mediaAppleMusic`: Opens `Privacy & Security > Media & Apple Music`.
+- `.screenRecording`: Opens `Privacy & Security > Screen Recording`.
+
+For every other `System Settings` page or privacy subsection, use `SystemSettingsKit`.
+
+## Quick Start
+
+### SwiftUI button
+
+```swift
+import PermissionFlow
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        PermissionFlowButton(
+            title: "Grant Accessibility",
+            pane: .accessibility,
+            suggestedAppURLs: [Bundle.main.bundleURL]
+        )
+    }
+}
+```
+
+### Manual controller usage
+
+Use `PermissionFlowController` when you want to control the flow yourself:
+
+```swift
+import PermissionFlow
+import SwiftUI
+
+@MainActor
+final class PermissionViewModel: ObservableObject {
+    private let controller = PermissionFlow.makeController()
+
+    func requestFullDiskAccess() {
+        controller.authorize(
+            pane: .fullDiskAccess,
+            suggestedAppURLs: [Bundle.main.bundleURL]
+        )
+    }
+}
+```
+
+### Keep the launch animation
+
+If you use `PermissionFlowButton`, the package captures the click position for you and the floating panel will animate from the button click to the `System Settings` window automatically.
+
+If you call `PermissionFlowController.authorize(...)` manually, pass the click source frame yourself. Otherwise the panel will still appear, but it will skip the launch animation and jump directly to the target position.
+
+```swift
+import AppKit
+import PermissionFlow
+
+@MainActor
+final class PermissionViewModel: ObservableObject {
+    private let controller = PermissionFlow.makeController()
+
+    func requestAccessibility() {
+        let mouseLocation = NSEvent.mouseLocation
+        let sourceFrame = CGRect(
+            x: mouseLocation.x - 16,
+            y: mouseLocation.y - 16,
+            width: 32,
+            height: 32
+        )
+
+        controller.authorize(
+            pane: .accessibility,
+            suggestedAppURLs: [Bundle.main.bundleURL],
+            sourceFrameInScreen: sourceFrame
+        )
+    }
+}
+```
+
+## Public API
+
+### `PermissionFlowButton`
+
+Convenience SwiftUI button for launching a permission flow.
+
+```swift
+PermissionFlowButton(
+    title: "Open Screen Recording",
+    pane: .screenRecording,
+    suggestedAppURLs: [Bundle.main.bundleURL],
+    configuration: .init()
+)
+```
+
+### `PermissionFlow.makeController`
+
+Creates a reusable controller:
+
+```swift
+let controller = PermissionFlow.makeController(
+    configuration: .init(
+        requiredAppURLs: [Bundle.main.bundleURL],
+        promptForAccessibilityTrust: false
+    )
+)
+```
+
+### `PermissionFlowController`
+
+Main entry points:
+
+- `authorize(pane:suggestedAppURLs:sourceFrameInScreen:)`
+- `showPanel()`
+- `closePanel()`
+- `resetDroppedApps()`
+- `registerDroppedApp(_:)`
+
+### `SystemSettings.open`
+
+Open any System Settings page directly from a pane identifier and optional anchor:
+
+```swift
+import SystemSettingsKit
+
+SystemSettings.open(
+    paneIdentifier: "com.apple.Wallpaper-Settings.extension"
+)
+
+SystemSettings.open(
+    paneIdentifier: "com.apple.settings.PrivacySecurity.extension",
+    anchor: "Privacy_Advertising"
+)
+```
+
+You can also use `SystemSettingsDestination`:
+
+```swift
+import SystemSettingsKit
+
+SystemSettings.open(.wallpaper)
+SystemSettings.open(.privacy(anchor: .privacyAllFiles))
+SystemSettings.open(.displays(anchor: .resolutionSection))
+```
+
+## System Settings URL Scheme
+
+`SystemSettingsKit` exposes a lightweight API for opening arbitrary System Settings panes using the `x-apple.systempreferences:` URL scheme.
+
+The behavior and examples are based on the identifiers and deeplink notes collected in [SystemSettings-URLs-macOS](https://github.com/jaywcjlove/SystemSettings-URLs-macOS/blob/main/README.md).
+
+### URL format
+
+```text
+x-apple.systempreferences:<pane-identifier>
+x-apple.systempreferences:<pane-identifier>?<anchor>
+```
+
+Examples:
+
+```text
+x-apple.systempreferences:com.apple.Wallpaper-Settings.extension
+x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Advertising
+x-apple.systempreferences:com.apple.Wallpaper-Settings.extension?ScreenSaver
+```
+
+### Package type
+
+```swift
+public struct SystemSettingsDestination {
+    public let paneIdentifier: String
+    public let anchor: String?
+    public var url: URL { get }
+}
+```
+
+### Convenience destinations
+
+The package includes a few common helpers:
+
+- `.wallpaper`
+- `.displays`
+- `.displays(anchor:)`
+- `.bluetooth`
+- `.loginItems`
+- `.privacy(anchor:)`
+
+### Privacy anchors
+
+For Privacy & Security subsections, use:
+
+```swift
+SystemSettings.open(.privacy(anchor: .privacyAllFiles))
+SystemSettings.open(.privacy(anchor: .privacyAdvertising))
+SystemSettings.open(.privacy(anchor: .privacyAccessibility))
+SystemSettings.open(.privacy(anchor: .security))
+```
+
+The existing `PermissionFlowPane` type continues to handle the privacy pages used by the floating authorization workflow.
+
+- `.appManagement`: Opens `Privacy & Security > App Management`.
+- `.accessibility`: Opens `Privacy & Security > Accessibility`.
+- `.bluetooth`: Opens `Privacy & Security > Bluetooth`.
+- `.developerTools`: Opens `Privacy & Security > Developer Tools`.
+- `.fullDiskAccess`: Opens `Privacy & Security > Full Disk Access`.
+- `.inputMonitoring`: Opens `Privacy & Security > Input Monitoring`.
+- `.mediaAppleMusic`: Opens `Privacy & Security > Media & Apple Music`.
+- `.screenRecording`: Opens `Privacy & Security > Screen Recording`.
+
+Available typed privacy anchors and their destinations:
+
+- `.advanced`: `Privacy & Security > Advanced`
+- `.fileVault`: `Privacy & Security > FileVault`
+- `.locationAccessReport`: `Privacy & Security > Location Access Report`
+- `.lockdownMode`: `Privacy & Security > Lockdown Mode`
+- `.privacyAccessibility`: `Privacy & Security > Accessibility`
+- `.privacyAdvertising`: `Privacy & Security > Advertising`
+- `.privacyAllFiles`: `Privacy & Security > Full Disk Access`
+- `.privacyAnalytics`: `Privacy & Security > Analytics & Improvements`
+- `.privacyAppBundles`: `Privacy & Security > App Management`
+- `.privacyAudioCapture`: `Privacy & Security > Audio Capture`
+- `.privacyAutomation`: `Privacy & Security > Automation`
+- `.privacyBluetooth`: `Privacy & Security > Bluetooth`
+- `.privacyCalendars`: `Privacy & Security > Calendars`
+- `.privacyCamera`: `Privacy & Security > Camera`
+- `.privacyContacts`: `Privacy & Security > Contacts`
+- `.privacyDevTools`: `Privacy & Security > Developer Tools`
+- `.privacyFilesAndFolders`: `Privacy & Security > Files & Folders`
+- `.privacyFocus`: `Privacy & Security > Focus`
+- `.privacyHomeKit`: `Privacy & Security > Home`
+- `.privacyListenEvent`: `Privacy & Security > Input Monitoring`
+- `.privacyLocationServices`: `Privacy & Security > Location Services`
+- `.privacyMedia`: `Privacy & Security > Media & Apple Music`
+- `.privacyMicrophone`: `Privacy & Security > Microphone`
+- `.privacyMotion`: `Privacy & Security > Motion & Fitness`
+- `.privacyNudityDetection`: `Privacy & Security > Sensitive Content Warning`
+- `.privacyPasskeyAccess`: `Privacy & Security > Passkey Access`
+- `.privacyPhotos`: `Privacy & Security > Photos`
+- `.privacyReminders`: `Privacy & Security > Reminders`
+- `.privacyRemoteDesktop`: `Privacy & Security > Remote Desktop`
+- `.privacyScreenCapture`: `Privacy & Security > Screen Recording`
+- `.privacySpeechRecognition`: `Privacy & Security > Speech Recognition`
+- `.privacySystemServices`: `Privacy & Security > System Services`
+- `.security`: `Privacy & Security > Security`
+- `.securityImprovements`: `Privacy & Security > Security Improvements`
+
+### Displays anchors
+
+Displays now has a typed helper instead of raw string anchors:
+
+```swift
+SystemSettings.open(.displays)
+SystemSettings.open(.displays(anchor: .arrangementSection))
+SystemSettings.open(.displays(anchor: .resolutionSection))
+SystemSettings.open(.displays(anchor: .nightShiftSection))
+```
+
+Available display anchors and their destinations:
+
+- `.advancedSection`: `Displays > Advanced`
+- `.ambienceSection`: `Displays > Ambience`
+- `.arrangementSection`: `Displays > Arrangement`
+- `.characteristicSection`: `Displays > Display Characteristics`
+- `.displaysSection`: `Displays > Displays`
+- `.miscellaneousSection`: `Displays > Miscellaneous`
+- `.nightShiftSection`: `Displays > Night Shift`
+- `.profileSection`: `Displays > Color Profile`
+- `.resolutionSection`: `Displays > Resolution`
+- `.sidecarSection`: `Displays > Sidecar`
+
+## Configuration
+
+```swift
+let configuration = PermissionFlowConfiguration(
+    requiredAppURLs: [Bundle.main.bundleURL],
+    promptForAccessibilityTrust: false
+)
+```
+
+### Notes
+
+- `requiredAppURLs` preloads apps into the panel
+- `promptForAccessibilityTrust` controls whether AX trust is actively prompted
+
+## How It Works
+
+1. Your app requests a permission pane.
+2. `PermissionFlow` opens the matching `System Settings` page.
+3. If that pane supports drag-based authorization, a floating panel appears.
+4. The panel animates from the click location to the `System Settings` window.
+5. The panel tracks the `System Settings` window position.
+6. The user drags the current `.app` bundle into the permission list.
+
+## Example
+
+The repository includes an `Example` macOS app that demonstrates all supported permission flows.
+
+## Notes and Limitations
+
+- The floating helper is only shown for panes that support app-list style authorization.
+- `System Settings` behavior is controlled by macOS and may vary slightly by OS version.
+- AX-based window tracking is used when available. Window Server frame lookup is used as fallback and bootstrap.
+- The package does not bypass macOS security. It only guides the user through the system UI.
+
+## License
+
+Licensed under the MIT License.
