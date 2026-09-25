@@ -23,6 +23,12 @@
 
 ---
 
+<p align="center">
+  <video src="assets/demo-vid.mp4" controls="controls" muted="muted" width="860" style="max-width: 100%;">
+    <a href="assets/demo-vid.mp4">Watch Demo Video</a>
+  </video>
+</p>
+
 Chrome cycles tabs in tab-strip order. TabCircle makes `Ctrl + Tab` cycle them by recent use and shows a switcher overlay while you hold the key, the same way `Cmd + Tab` (`⌘ + ⇥`) works for applications.
 
 ## Features
