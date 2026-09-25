@@ -1,13 +1,18 @@
-<h3 align="center">⌘ TabCircle</h3>
+<p align="center">
+  <img src="assets/icon-128.png" width="80" height="80" alt="TabCircle Logo">
+</p>
+
+<h3 align="center">TabCircle</h3>
 
 <p align="center">
   <strong>Supercharge Chrome's tab experience — MRU switching, tab management, and pins that persist.</strong><br>
-  Hold ⌃ and tap ⇥ to move through tabs in the order you used them.
+  Hold <kbd>Ctrl</kbd> and tap <kbd>Tab</kbd> to move through tabs in the order you used them.
 </p>
 
 <p align="center">
   <a href="https://github.com/sniperravan/TabCircle/stargazers"><img src="https://img.shields.io/github/stars/sniperravan/TabCircle?style=flat-square&color=F59E0B&label=Stars" alt="Stars"></a>
-  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Linux%20(X11)-orange?style=flat-square" alt="Linux">
+  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?style=flat-square" alt="macOS">
   <img src="https://img.shields.io/badge/Chrome-116%2B-7C3AED?style=flat-square" alt="Chrome">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
 </p>
@@ -16,44 +21,46 @@
   <a href="#installation">🚀 <strong>Get Started</strong></a> ｜ <a href="https://github.com/sniperravan/TabCircle">📦 <strong>GitHub</strong></a>
 </p>
 
-
 ---
 
-
-Chrome cycles tabs in tab-strip order. TabCircle makes ⌃⇥ cycle them by recent use and shows a switcher overlay while you hold the key, the same way ⌘⇥ works for applications.
+Chrome cycles tabs in tab-strip order. TabCircle makes `Ctrl + Tab` cycle them by recent use and shows a switcher overlay while you hold the key, the same way `Cmd + Tab` (`⌘ + ⇥`) works for applications.
 
 ## Features
 
-- ⌃⇥ switches to the tab you used last
-- Tapping ⌃⇥ again returns to where you started, so A↔B toggling stays stable
+- `Ctrl + Tab` (`⌃ + ⇥`) switches to the tab you used last
+- Tapping `Ctrl + Tab` again returns to where you started, so A↔B toggling stays stable
 - Every tab in the list carries a live page thumbnail
-- Keyboard (⌃⇥, ⌃⇧⇥), arrow keys and mouse clicks all drive the switcher
+- Keyboard (`Ctrl + Tab`, `Ctrl + Shift + Tab`), arrow keys and mouse clicks all drive the switcher
 - Two switcher layouts: a horizontal strip, or an adaptive grid that fits every tab on one screen
 - The overlay is centered on the Chrome window in use, across multiple displays
 - Light and dark appearance follow the system setting
 - In-app updates — checks GitHub Releases on a schedule you pick and installs in place after one click
-- If the helper or extension is unavailable, ⌃⇥ falls back to Chrome's built-in behavior
+- If the helper or extension is unavailable, `Ctrl + Tab` falls back to Chrome's built-in behavior
 
 ## How it works
 
 TabCircle runs as two parts that talk over a loopback WebSocket:
 
-```
-┌─────────────────────────┐         ┌──────────────────────────┐
-│  Chrome extension (MV3) │  loop   │  Swift helper            │
-│                         │◄──ws───►│                          │
-│  · tabs.onActivated     │  :41573 │  · CGEventTap  (⌃⇥)      │
-│    → maintain MRU order │         │  · NSPanel     (overlay) │
-│  · captureVisibleTab    │         │  · MRU state machine     │
-│    → collect thumbnails │         │                          │
-│  · tabs.update          │         │                          │
-│    → perform the switch │         │                          │
-└─────────────────────────┘         └──────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph EXT["Chrome Extension (MV3)"]
+        A["tabs.onActivated\n→ maintain MRU order"]
+        B["captureVisibleTab\n→ collect thumbnails"]
+        C["tabs.update\n→ perform the switch"]
+    end
+
+    subgraph HELPER["Native Helper"]
+        D["Keyboard Hook\n(CGEventTap / X11 Grab)"]
+        E["Overlay Panel\n(NSPanel / PyQt6)"]
+        F["MRU State Machine"]
+    end
+
+    EXT <-->|"WebSocket\nws://127.0.0.1:41573"| HELPER
 ```
 
 Both halves are required:
 
-- **The extension cannot read the keyboard.** `Tab` was removed from the supported-key list of `chrome.commands` in Chrome 33, so no extension can bind ⌃⇥.
+- **The extension cannot read the keyboard.** `Tab` was removed from the supported-key list of `chrome.commands` in Chrome 33, so no extension can bind `Ctrl + Tab`.
 - **The helper cannot read the tabs.** Titles, MRU order, thumbnails and switching all go through the `chrome.tabs` API.
 
 ## Installation
@@ -107,7 +114,7 @@ For users on battery, lightweight laptops, or systems with weaker CPUs, you can 
   }
   ```
 - **Precedence**: CLI flag (`--low-resource` / `--no-low-resource`) > Configuration file (`config.json`) > Default (`false`).
-*(Note: If you edit `config.json` manually while the daemon is running, restart it with `./scripts/install-linux.sh --restart` or click reload on the extension in `chrome://extensions`).*
+*(Note: If you edit `config.json` manually while the daemon is running, restart it with `./scripts/install-linux.sh --restart` or click reload on the extension in `chrome://extensions`.)*
 
 #### Manual Execution
 If you prefer running without session autostart:
@@ -143,7 +150,7 @@ swift build -c release
 
 ### 4. Grant Accessibility permission
 
-The helper installs a `CGEventTap` to intercept ⌃⇥ before Chrome receives it, which requires Accessibility access.
+The helper installs a `CGEventTap` to intercept `Ctrl + Tab` (`⌃ + ⇥`) before Chrome receives it, which requires Accessibility access.
 
 Start it once:
 
@@ -166,7 +173,7 @@ Startup output:
 ```
 [HH:MM:SS.mmm] tabcircle started — binary built ...
 [HH:MM:SS.mmm] WebSocket server listening → ws://127.0.0.1:41573/
-[HH:MM:SS.mmm] Keyboard hook installed — waiting for ⌃⇥ in Chrome
+[HH:MM:SS.mmm] Keyboard hook installed — waiting for Ctrl+Tab in Chrome
 [HH:MM:SS.mmm] ✅ Extension connected (1 client(s))
 ```
 
@@ -178,25 +185,25 @@ The last line confirms the extension reached the helper.
 
 | Action | Result |
 |---|---|
-| Tap ⌃⇥ and release | Switch to the previously used tab |
-| Tap ⌃⇥ twice | Return to the tab you started from |
-| Hold ⌃, tap ⇥ repeatedly | Move further back through the history |
-| Hold ⌃, press ⌃⇧⇥ | Move forward |
-| Hold ⌃, press ← or → | Move the cursor with arrow keys |
-| Hold ⌃, press ↑ or ↓ | Move by row (grid layout) |
-| Hold ⌃, click a card | Switch to that tab immediately |
-| Hold ⌃, hover a card | Move the cursor with the mouse |
+| Tap `Ctrl + Tab` and release | Switch to the previously used tab |
+| Tap `Ctrl + Tab` twice | Return to the tab you started from |
+| Hold `Ctrl`, tap `Tab` repeatedly | Move further back through the history |
+| Hold `Ctrl`, press `Ctrl + Shift + Tab` | Move forward |
+| Hold `Ctrl`, press `←` or `→` | Move the cursor with arrow keys |
+| Hold `Ctrl`, press `↑` or `↓` | Move by row (grid layout) |
+| Hold `Ctrl`, click a card | Switch to that tab immediately |
+| Hold `Ctrl`, hover a card | Move the cursor with the mouse |
 
-The overlay appears when you press ⇥ and closes when you release ⌃. A single quick tap flashes it briefly, matching the behaviour of ⌘⇥.
+The overlay appears when you press `Tab` and closes when you release `Ctrl`. A single quick tap flashes it briefly, matching the behaviour of `Cmd + Tab` (`⌘ + ⇥`).
 
 ### Settings
 
-Open the settings window from the menu bar icon (**Settings…**, or ⌘, while a TabCircle window is focused) or by clicking the TabCircle icon in the Chrome toolbar. Changes take effect immediately — nothing needs to restart.
+Open the settings window from the menu bar icon (**Settings…**, or `⌘ + ,` while a TabCircle window is focused) or by clicking the TabCircle icon in the Chrome toolbar. Changes take effect immediately — nothing needs to restart.
 
 | Setting | Default | Effect |
 |---|---|---|
 | Limit switching to the current window | On | The switcher lists only the tabs of the Chrome window in use. Turn it off to cycle through every window's tabs in one list. |
-| Switcher layout | Horizontal strip | Grid wraps the cards so every tab fits on one screen; ⌃↑/⌃↓ then move by row. |
+| Switcher layout | Horizontal strip | Grid wraps the cards so every tab fits on one screen; `Ctrl + ↑` / `Ctrl + ↓` then move by row. |
 | Check for updates | Daily | Automatic update checks: daily / weekly / never. Updates download, install in place, and relaunch after you confirm. |
 | Language / Appearance / Open at Login | — | Interface language, light/dark override, launch at login. |
 
@@ -226,16 +233,16 @@ Start with the helper log:
 Tab cache storage:
 - **Linux**: `/tmp/tabcircle/tabs_cache.json` (instant tab recovery on restart, managed in system temp directory)
 
-### ⌃⇥ does nothing
+### Ctrl + Tab does nothing
 
 Look for `✅ Extension connected` in the log.
 
 - **Line missing** — the extension is not reaching the helper. Confirm the helper process is running and the extension is enabled in `chrome://extensions`.
-- **Line present, native switching still happens** — the connection dropped afterwards. TabCircle passes ⌃⇥ through to Chrome whenever it is disconnected, so Chrome's own switching is the expected fallback.
+- **Line present, native switching still happens** — the connection dropped afterwards. TabCircle passes `Ctrl + Tab` through to Chrome whenever it is disconnected, so Chrome's own switching is the expected fallback.
 
 ### `CGEvent.tapCreate failed`
 
-Accessibility permission is missing or stale. Follow step 4 of the installation. The terminal app must be quit completely (⌘Q, not just closing the window) before a newly granted permission applies.
+Accessibility permission is missing or stale. Follow step 4 of the installation. The terminal app must be quit completely (`⌘ + Q`, not just closing the window) before a newly granted permission applies.
 
 ### Code changes have no effect
 
@@ -254,7 +261,7 @@ The overlay follows the frontmost Chrome window. With windows on several display
 
 ### Linux: Cinnamon "Locate Pointer" Interaction
 
-On Cinnamon desktops with "Show position of pointer when the Control key is pressed" (`locate-pointer`) enabled, Cinnamon places a synchronous grab on `Control` at the root window. When `Ctrl+Tab` is pressed, Cinnamon replays the event via `XReplayKeyboard`, which by X11 specification skips root-level passive grabs.
+On Cinnamon desktops with "Show position of pointer when the Control key is pressed" (`locate-pointer`) enabled, Cinnamon places a synchronous grab on `Control` at the root window. When `Ctrl + Tab` is pressed, Cinnamon replays the event via `XReplayKeyboard`, which by X11 specification skips root-level passive grabs.
 
 TabCircle implements **dynamic window-targeted passive grabs** attached directly to the active browser window upon focus changes (`_NET_ACTIVE_WINDOW`), ensuring native interception. If you ever experience issues on older desktop environments:
 ```bash
@@ -264,9 +271,9 @@ gsettings set org.cinnamon.desktop.peripherals.mouse locate-pointer false
 ## Acknowledgements & Inspirations
 
 TabCircle draws inspiration from:
-- **macOS `⌘⇥` & Arc Browser**: The fluid, responsive visual layout, typography, and card-based overlay design principles that make fast keyboard navigation feel native and effortless.
+- **macOS `Cmd + Tab` (`⌘ + ⇥`) & Arc Browser**: The fluid, responsive visual layout, typography, and card-based overlay design principles that make fast keyboard navigation feel native and effortless.
 - **Native Extension Companions**: Pairing MV3 browser extensions with native system daemons to achieve low-latency MRU tab switching with synchronous event interception and continuous squircle geometry.
 
 ## License
 
-[MIT](./LICENSE) © [sniperravan](https://github.com/sniperravan)
+[MIT License](./LICENSE) © [sniperravan](https://github.com/sniperravan)
