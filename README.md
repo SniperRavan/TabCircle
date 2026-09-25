@@ -98,17 +98,23 @@ This installs the required dependencies (`PyQt6`, `python-xlib`, `websockets`), 
 ./scripts/install-linux.sh --uninstall
 ```
 
-#### Low-Resource / Favicon-Only Mode (Minimal RAM & CPU)
-For lightweight environments or machines with lower RAM, you can disable viewport screenshot captures while keeping the full MRU tab switcher functionality:
-- **Automated setup**: Run `./scripts/install-linux.sh --low-resource`
-- **Manual CLI**: Pass `--low-resource` when running `python3 linux-helper/app.py --low-resource`
+#### Low-Resource / Favicon-Only Mode
+For users on battery, lightweight laptops, or systems with weaker CPUs, you can disable viewport screenshot captures while keeping the full MRU tab switcher functionality:
+- **What it saves**: Eliminates browser-side CPU spikes on tab switches (completely bypasses `chrome.tabs.captureVisibleTab`, canvas allocations, and JPEG encoding) and saves ~2.5–5MB of image cache.
+- **What it does NOT change**: The Python helper baseline memory (~50–80MB RSS) remains standard, as it is consumed by the Python runtime, PyQt6, Qt rendering libraries, and X11 bindings.
+- **Automated setup**: Run `./scripts/install-linux.sh --low-resource` (or `./scripts/install-linux.sh --restart` to apply)
+- **Manual CLI**: Pass `--low-resource` (or `--no-low-resource` to force standard mode):
+  ```bash
+  python3 linux-helper/app.py --low-resource
+  ```
 - **Configuration file**: Set `"low_resource_mode": true` in `~/.config/tabcircle/config.json`:
   ```json
   {
     "low_resource_mode": true
   }
   ```
-In this mode, the extension completely bypasses `captureVisibleTab` and canvas encoding, and the overlay renders high-contrast, beautiful favicon cards.
+- **Precedence**: CLI flag (`--low-resource` / `--no-low-resource`) > Configuration file (`config.json`) > Default (`false`).
+*(Note: If you edit `config.json` manually while the daemon is running, restart it with `./scripts/install-linux.sh --restart` or click reload on the extension in `chrome://extensions`).*
 
 #### Manual Execution
 If you prefer running without session autostart:

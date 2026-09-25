@@ -13,9 +13,10 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tabcircle"
 CONFIG_FILE="$CONFIG_DIR/config.json"
 
 usage() {
-    echo "Usage: $0 [--install] [--uninstall] [--status] [--low-resource]"
+    echo "Usage: $0 [--install] [--uninstall] [--restart] [--status] [--low-resource]"
     echo "  --install       Install dependencies and register autostart (default)"
     echo "  --low-resource  Configure low-resource / favicon-only mode (minimal RAM/CPU)"
+    echo "  --restart       Restart running helper daemon"
     echo "  --uninstall     Remove autostart and terminate running helper"
     echo "  --status        Check if helper is running and autostart is active"
     exit 1
@@ -67,6 +68,9 @@ for arg in "$@"; do
         --low-resource)
             LOW_RESOURCE=true
             ;;
+        --restart)
+            MODE="--restart"
+            ;;
         --uninstall)
             MODE="--uninstall"
             ;;
@@ -86,6 +90,20 @@ for arg in "$@"; do
 done
 
 case "$MODE" in
+    --restart)
+        echo "==> Restarting TabCircle Helper..."
+        stop_helper
+        echo "==> Starting TabCircle helper daemon in background..."
+        nohup python3 "$PROJECT_DIR/linux-helper/app.py" >/dev/null 2>&1 &
+        sleep 0.5
+        started_pid="$(get_helper_pid || true)"
+        if [ -n "$started_pid" ]; then
+            echo "✓ TabCircle helper restarted successfully (PID $started_pid)."
+        else
+            echo "Warning: Helper daemon may not have started. Check logs: $LOG_FILE"
+        fi
+        exit 0
+        ;;
     --uninstall)
         echo "==> Uninstalling TabCircle Helper..."
         if [ -f "$DESKTOP_FILE" ]; then

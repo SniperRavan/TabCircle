@@ -219,8 +219,11 @@ def load_helper_config():
         except Exception as e:
             logger.warning(f"Could not read config file {CONFIG_FILE}: {e}")
 
+    # Explicit precedence: CLI flags override configuration file
     if "--low-resource" in sys.argv:
         config["low_resource_mode"] = True
+    elif "--no-low-resource" in sys.argv:
+        config["low_resource_mode"] = False
 
     return config
 
@@ -1357,6 +1360,8 @@ async def ws_handler(websocket):
 
     logger.info("Chrome Extension connected.")
     ws_clients.add(websocket)
+    global helper_config
+    helper_config = load_helper_config()
 
     # Initial handshake (tabLifetimeHours: 0 disables idle closing until settings UI is added)
     try:
@@ -1422,6 +1427,7 @@ async def ws_handler(websocket):
                             logger.error(f"Error decoding thumbnail for tab {tab_id}: {e}")
 
                 elif msg_type == "requestSettings":
+                    helper_config = load_helper_config()
                     await websocket.send(json.dumps({
                         "type": "settings",
                         "scopeToWindow": True,

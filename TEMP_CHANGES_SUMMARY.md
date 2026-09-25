@@ -411,20 +411,20 @@ The macOS helper is an AppKit menu bar accessory application (`TabCircle.app`). 
 ## 6. Low-Resource Mode, Log Rotation, and Path Clarifications
 
 ### A. Low-Resource / Favicon-Only Mode
-For resource-constrained devices or users prioritizing minimal RAM and CPU:
-- **CLI Flag**: `python3 linux-helper/app.py --low-resource`
-- **User Config**: `~/.config/tabcircle/config.json` (or `$XDG_CONFIG_HOME/tabcircle/config.json`):
-  ```json
-  {
-    "low_resource_mode": true
-  }
-  ```
-- **Automated Installer**: `./scripts/install-linux.sh --low-resource`
-- **Extension Integration**:
-  - The Python helper sends `"captureThumbnails": false` in the initial WebSocket handshake and `requestSettings` response.
-  - `extension/background.js` checks `if (settings.captureThumbnails === false) return;` inside both `scheduleThumbnail` and `captureThumbnail`.
-  - Zero calls to `chrome.tabs.captureVisibleTab`, zero canvas allocations, zero JPEG encoding, and zero base64 payload transfers over loopback.
-  - The visual overlay dynamically renders each card with a clean, centered 28x28 high-contrast favicon and title bar.
+For resource-constrained devices, laptops on battery, or users prioritizing CPU conservation:
+- **Realistic Resource Impact**:
+  - *Extension CPU Savings (Primary Benefit)*: Disables `chrome.tabs.captureVisibleTab`, offscreen canvas re-scaling, JPEG encoding, and base64 loopback serialization on every tab switch.
+  - *Helper Image Memory Savings*: Frees ~2.5–5MB of thumbnail QImage/QPixmap cache.
+  - *Python/Qt Baseline (Unchanged)*: The helper itself still occupies ~50–80MB RSS memory, which is the baseline footprint of Python 3, PyQt6, Qt's rendering libraries, and X11 bindings.
+- **Explicit Precedence Hierarchy**:
+  1. CLI Flags: `--low-resource` (force ON) or `--no-low-resource` (force OFF)
+  2. Configuration File: `~/.config/tabcircle/config.json` (`{"low_resource_mode": true}`)
+  3. Safe Default: `false` (standard mode with rich visual screenshots)
+- **Runtime Refresh**:
+  - The configuration file is re-read on every extension WebSocket connection and `requestSettings` handshake.
+  - Running `./scripts/install-linux.sh --restart` restarts the running daemon in one step.
+- **Overlay UI Fidelity**:
+  - Cards in low-resource mode render with the authentic continuous squircle geometry, centered 28×28 high-contrast favicons (with vector globe fallback), top-left pinned star badge (★), and hover close button (✕).
 
 ### B. Persistent Log Rotation
 - Replaced unconstrained logging in `linux-helper/app.py` with `RotatingFileHandler(..., maxBytes=5*1024*1024, backupCount=3)`.
