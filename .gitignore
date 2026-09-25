@@ -34,6 +34,7 @@ linux-helper/venv/
 test_*.py
 !tests/
 !tests/**
+tests/__pycache__/
 
 # Swift / SwiftPM (macOS)
 helper/.build/

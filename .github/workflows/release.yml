@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r linux-helper/requirements.txt
+
+      - name: Run Unit Tests
+        run: |
+          python -m unittest discover tests
+
+      - name: Package Release Artifacts
+        run: |
+          bash scripts/package-release.sh
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/TabCircle-Extension.zip
+            release/tabcircle-linux.tar.gz
+            release/checksums.txt
+          generate_release_notes: true
