@@ -31,9 +31,9 @@ public struct PermissionFlowButton: View {
             )
         } label: {
             if let title {
-                Text(title)
+                Text(String(localized: title))
             } else {
-                Text(LocalizedStringResource("permission_flow.button.grant", locale: locale, bundle: .atURL(Bundle.permissionFlowResources.bundleURL)))
+                Text(String(localized: LocalizedStringResource("permission_flow.button.grant", locale: locale, bundle: .atURL(Bundle.permissionFlowResources.bundleURL))))
             }
         }
     }
