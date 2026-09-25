@@ -1,8 +1,8 @@
 # Session Memory
 
 ## Current State
-- **Project Name:** TabCircle (formerly TabFlick)
-- **Author:** sniperravan (formerly lifedever)
+- **Project Name:** TabCircle
+- **Author:** sniperravan
 - **Phase:** Phase 4 - UI Overlay & Reliable Tab Switching
 
 ## Completed Work

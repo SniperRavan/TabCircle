@@ -28,7 +28,7 @@ get_helper_pid() {
         local pid
         pid="$(cat "$PID_FILE" 2>/dev/null || true)"
         if [ -n "$pid" ] && [ -d "/proc/$pid" ]; then
-            if grep -q -a -E "python.*app\.py" "/proc/$pid/cmdline" 2>/dev/null; then
+            if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q -E "(^|/)python[0-9.]* .*linux-helper/app\.py"; then
                 echo "$pid"
                 return 0
             fi

@@ -980,7 +980,7 @@ class SquircleContainer(QFrame):
 # --- PyQt6 Overlay Window ---
 class SwitcherOverlay(QWidget):
     """
-    Native floating translucent overlay panel matching macOS TabCircle / TabFlick:
+    Native floating translucent overlay panel matching macOS TabCircle:
     - Pure horizontal card strip (no header, no title, no tab counter, no clutter)
     - 14px squircle continuous dark/light glass panel with 1px hairline border
     - Outer padding: 12px, spacing between cards: 8px

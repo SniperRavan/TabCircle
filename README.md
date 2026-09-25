@@ -271,8 +271,8 @@ gsettings set org.cinnamon.desktop.peripherals.mouse locate-pointer false
 ## Acknowledgements & Inspirations
 
 TabCircle draws inspiration from:
-- **[TabFlick](https://github.com/lifedever)** by lifedever: Pioneered the concept of pairing an MV3 Chromium browser extension with a native companion daemon for fast MRU tab switching on macOS. TabCircle takes this workflow inspiration and reimplements the system natively for Linux (X11, PyQt6, Chromium/Brave) featuring low-level synchronous event interception, real-time pixel luminance sampling, and continuous squircle geometry.
 - **macOS `⌘⇥` & Arc Browser**: The fluid, responsive visual layout, typography, and card-based overlay design principles that make fast keyboard navigation feel native and effortless.
+- **Native Extension Companions**: Pairing MV3 browser extensions with native system daemons to achieve low-latency MRU tab switching with synchronous event interception and continuous squircle geometry.
 
 ## Sponsor
 
