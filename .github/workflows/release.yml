@@ -105,9 +105,40 @@ jobs:
           echo "--> Generated checksums:"
           cat checksums.txt
 
+      - name: Generate Release Notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cat << EOF > release-notes.md
+          ## What's New
+
+          - **Automated macOS DMG Packaging**: Built on \`macos-14\` (Apple Silicon) runners, providing native \`arm64\` and \`x86_64\` disk images.
+          - **Linux Helper Auto-Update**: Background update check against GitHub Releases (\`./scripts/install-linux.sh --check-updates\`) with \`notify-send\` desktop alerts.
+          - **Wayland Compatibility Detection**: Clear diagnostics and actionable guidance (\`--ozone-platform=x11\`) for browsers running under Wayland.
+          - **Unified 5-Asset Distribution**: Extension, Linux daemon, Apple Silicon DMG, Intel DMG, and unified SHA-256 checksums in every release.
+          - **Browser Extension Updated**: Manifest bumped to v\${VERSION}. Reload unpacked from \`chrome://extensions\` after downloading.
+
+          ### System Requirements
+          - **Linux**: Python 3.9+, X11 session (Cinnamon, GNOME on Xorg, KDE, XFCE, MATE), Chromium-based browser (Chrome, Brave, Edge) 116+.
+          - **macOS**: macOS 14+ (Sonoma, Sequoia), Chromium-based browser 116+.
+
+          ### Download
+
+          | File | Operating System | Architecture / Notes |
+          |---|---|---|
+          | **\`TabCircle-\${VERSION}-arm64.dmg\`** | macOS | Apple Silicon (M1/M2/M3/M4) |
+          | **\`TabCircle-\${VERSION}-x86_64.dmg\`** | macOS | Intel |
+          | **\`tabcircle-linux.tar.gz\`** | Linux (X11) | Helper daemon + \`install-linux.sh\` |
+          | **\`TabCircle-Extension.zip\`** | Linux & macOS | Browser extension (unzip and load in \`chrome://extensions\`) |
+          | **\`checksums.txt\`** | All | SHA-256 verification hashes |
+
+          > [!NOTE]
+          > **macOS First Launch:** Because these builds are ad-hoc signed, right-click \`TabCircle.app\` → **Open** on first launch to bypass Gatekeeper (or run \`xattr -d com.apple.quarantine /Applications/TabCircle.app\`).
+          EOF
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           files: |
             release-assets/TabCircle-Extension.zip
             release-assets/tabcircle-linux.tar.gz
