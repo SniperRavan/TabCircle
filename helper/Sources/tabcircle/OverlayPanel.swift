@@ -135,11 +135,8 @@ private let kCardSpacing: CGFloat = 8
 private let kOuterPadding: CGFloat = 12
 private let kPanelCornerRadius: CGFloat = 14
 
-/// Whether the background uses Liquid Glass (`NSGlassEffectView`, macOS 26+).
-private let kGlassBackdrop: Bool = {
-    if #available(macOS 26.0, *) { return true }
-    return false
-}()
+/// Whether the background uses Liquid Glass (macOS 26+).
+private let kGlassBackdrop: Bool = false
 
 // Global list layout metrics.
 private let kListWidth: CGFloat = 520
@@ -163,7 +160,7 @@ private let kRowIconSize: CGFloat = 17
 
 // MARK: - SwiftUI Content
 
-/// Fallback hand-drawn glass modifier for older macOS versions.
+/// Fallback hand-drawn glass modifier for standard macOS versions.
 private struct HandDrawnGlass: ViewModifier {
     let scheme: ColorScheme
     /// Refracting content modifier.
@@ -171,11 +168,7 @@ private struct HandDrawnGlass: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if refracting, #available(macOS 26.0, *) {
-            content.glassEffect(.regular,
-                                in: RoundedRectangle(cornerRadius: kPanelCornerRadius,
-                                                     style: .continuous))
-        } else if kGlassBackdrop {
+        if kGlassBackdrop {
             content
         } else {
             content
@@ -222,7 +215,7 @@ private struct SwitcherView: View {
         ScrollViewReader { proxy in
             content
             // Scroll only when cursor moved by keyboard.
-            .onChange(of: model.cursor) { newValue in
+            .onChange(of: model.cursor) { _, newValue in
                 guard model.cursorSource == .keyboard,
                       model.items.indices.contains(newValue) else { return }
                 withAnimation(.easeOut(duration: 0.12)) {
@@ -1041,15 +1034,6 @@ final class OverlayPanel {
     }
 
     private static func makeBackdrop(size: NSSize, content: NSView) -> NSView {
-        if #available(macOS 26.0, *), kGlassBackdrop {
-            let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
-            glass.cornerRadius = kPanelCornerRadius
-            glass.style = .regular
-            if #available(macOS 27.0, *) { glass.effectIsInteractive = true }
-            glass.contentView = content
-            return glass
-        }
-
         let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
         effect.material = .hudWindow
         effect.blendingMode = .behindWindow

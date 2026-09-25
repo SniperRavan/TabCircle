@@ -724,11 +724,6 @@ extension NSMenuItem {
     /// Standardized menu item icon visibility helper.
     var icon: NSImage? {
         get { image }
-        set {
-            image = newValue
-            if #available(macOS 27, *) {
-                preferredImageVisibility = newValue == nil ? .automatic : .visible
-            }
-        }
+        set { image = newValue }
     }
 }

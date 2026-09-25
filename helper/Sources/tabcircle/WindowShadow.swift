@@ -59,7 +59,7 @@ enum WindowShadow {
         }
 
         _ = set(cid, wid, deviation, density, 0, offsetY)
-        invalidate?(cid, wid)
+        _ = invalidate?(cid, wid)
     }
 
     // MARK: - Private Symbols (dynamically resolved)
