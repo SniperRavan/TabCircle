@@ -13,12 +13,13 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tabcircle"
 CONFIG_FILE="$CONFIG_DIR/config.json"
 
 usage() {
-    echo "Usage: $0 [--install] [--uninstall] [--restart] [--status] [--low-resource]"
-    echo "  --install       Install dependencies and register autostart (default)"
-    echo "  --low-resource  Configure low-resource / favicon-only mode (minimal RAM/CPU)"
-    echo "  --restart       Restart running helper daemon"
-    echo "  --uninstall     Remove autostart and terminate running helper"
-    echo "  --status        Check if helper is running and autostart is active"
+    echo "Usage: $0 [--install] [--uninstall] [--restart] [--status] [--low-resource] [--check-updates]"
+    echo "  --install        Install dependencies and register autostart (default)"
+    echo "  --low-resource   Configure low-resource / favicon-only mode (minimal RAM/CPU)"
+    echo "  --restart        Restart running helper daemon"
+    echo "  --uninstall      Remove autostart and terminate running helper"
+    echo "  --status         Check if helper is running and autostart is active"
+    echo "  --check-updates  Check GitHub for newer releases"
     exit 1
 }
 
@@ -74,6 +75,9 @@ for arg in "$@"; do
         --uninstall)
             MODE="--uninstall"
             ;;
+        --check-updates)
+            MODE="--check-updates"
+            ;;
         --status)
             MODE="--status"
             ;;
@@ -90,6 +94,11 @@ for arg in "$@"; do
 done
 
 case "$MODE" in
+    --check-updates)
+        echo "==> Checking for TabCircle updates..."
+        python3 "$PROJECT_DIR/linux-helper/update_checker.py" --force
+        exit 0
+        ;;
     --restart)
         echo "==> Restarting TabCircle Helper..."
         stop_helper

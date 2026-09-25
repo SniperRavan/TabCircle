@@ -1489,6 +1489,17 @@ def get_active_window_class(d, root):
         pass
     return ""
 
+def get_session_type():
+    return os.environ.get("XDG_SESSION_TYPE", "").lower()
+
+def browser_is_native_wayland(d, root):
+    """True only if the active browser has no X11 window at all (pure Wayland client)."""
+    try:
+        prop = root.get_full_property(d.intern_atom('_NET_ACTIVE_WINDOW'), X.AnyPropertyType)
+        return not prop or not prop.value or prop.value[0] == 0
+    except Exception:
+        return True
+
 def xlib_listener():
     global _ungrab_display
     d = display.Display()
@@ -1819,6 +1830,16 @@ def xlib_listener():
 
 # --- Main Application Entry ---
 def main():
+    # Detect pure Wayland without XWayland/DISPLAY
+    if get_session_type() == "wayland" and not os.environ.get("DISPLAY"):
+        logger.error(
+            "No X11 display found (pure Wayland, no XWayland). TabCircle needs "
+            "your browser to run under XWayland. Add this launch flag to your "
+            "browser shortcut: --ozone-platform=x11\n"
+            "See: https://github.com/sniperravan/TabCircle#wayland"
+        )
+        sys.exit(1)
+
     # 0. Ensure single instance and terminate any stale zombie background instances
     ensure_single_instance()
 
@@ -1845,6 +1866,18 @@ def main():
     app.setApplicationName("TabCircle")
     if os.path.exists(ICON_PATH):
         app.setWindowIcon(QIcon(ICON_PATH))
+
+    # 4. Check for updates in background (non-blocking)
+    try:
+        from update_checker import check_for_update, current_version
+        logger.info(f"TabCircle v{current_version()} starting")
+        threading.Thread(target=check_for_update, daemon=True).start()
+
+        update_timer = QTimer()
+        update_timer.timeout.connect(lambda: threading.Thread(target=check_for_update, daemon=True).start())
+        update_timer.start(6 * 3600 * 1000)  # re-check every 6h (throttled to once/day)
+    except Exception as e:
+        logger.debug(f"Update checker setup note: {e}")
 
     # Warm up FreeType font metrics and FontConfig cache to avoid first-paint latency
     dummy_lbl = QLabel()

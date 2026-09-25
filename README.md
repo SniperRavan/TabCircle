@@ -98,8 +98,9 @@ cd tabcircle-linux    # or whatever the extracted folder is named
 This installs `PyQt6`, `python-xlib`, and `websockets`; registers autostart at `~/.config/autostart/tabcircle.desktop`; and starts the helper.
 
 ```bash
-./scripts/install-linux.sh --status      # check it's running
-./scripts/install-linux.sh --uninstall   # remove it
+./scripts/install-linux.sh --status         # check it's running
+./scripts/install-linux.sh --check-updates  # check for newer releases
+./scripts/install-linux.sh --uninstall      # remove it
 ```
 
 <details>
@@ -257,6 +258,20 @@ TabCircle implements **dynamic window-targeted passive grabs** attached directly
 ```bash
 gsettings set org.cinnamon.desktop.peripherals.mouse locate-pointer false
 ```
+
+### Wayland
+
+TabCircle's Linux helper uses X11 passive grabs (`python-xlib`) to intercept `Ctrl + Tab`.
+- **Default Browsers on Wayland (XWayland)**: By default, Chrome, Brave, and Edge run through **XWayland** on most Linux desktops (GNOME, KDE Plasma), exposing a real X11 window. In this configuration, TabCircle works out of the box without any extra steps.
+- **Native Wayland Clients**: If your browser is launched as a native Wayland client (e.g. `--ozone-platform=wayland` or the `chrome://flags` ozone platform flag set to Wayland), X11 cannot see its window or keystrokes.
+  - **Fix**: Launch your browser with the XWayland platform flag:
+    ```bash
+    google-chrome --ozone-platform=x11
+    # or for Brave:
+    brave-browser --ozone-platform=x11
+    ```
+    You can also add `--ozone-platform=x11` to your browser's `.desktop` launcher in `~/.local/share/applications/`.
+- **Roadmap**: True global shortcuts on native Wayland require compositor portal protocols (`org.freedesktop.portal.GlobalShortcuts` via D-Bus). This is tracked for future architectural updates.
 
 ## Acknowledgements & Inspirations
 

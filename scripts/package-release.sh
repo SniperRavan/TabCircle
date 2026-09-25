@@ -38,6 +38,8 @@ rm -rf "$TMP_STAGE"
 
 # 2. Package Linux Helper Distribution
 echo "--> Creating tabcircle-linux.tar.gz..."
+VERSION="${1:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 1.0.0)}"
+echo "$VERSION" > "$PROJECT_DIR/linux-helper/VERSION"
 (
     cd "$PROJECT_DIR"
     tar --exclude='__pycache__' --exclude='*.pyc' --exclude='.DS_Store' --exclude='*.mp4' --exclude='*.gif' \

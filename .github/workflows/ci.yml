@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  extension-tests:
+    name: Extension tests (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node extension/tests/closed-tabs.test.js
+      - run: node extension/tests/lifetime-sweep.test.js
+
+  python-syntax:
+    name: Python syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m py_compile linux-helper/app.py linux-helper/update_checker.py
+
+  python-tests:
+    name: Python unit tests (Qt offscreen)
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install system Qt/X11 deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libgl1 libegl1 libxkbcommon0 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
+            libxcb-xinerama0 libxcb-xkb1
+      - run: pip install -r linux-helper/requirements.txt
+      - run: python3 tests/test_multimonitor.py
+      - run: python3 tests/test_config.py
+
+  shell-lint:
+    name: Shell script lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check
+        run: |
+          for f in scripts/*.sh; do bash -n "$f"; done
+      - uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: warning

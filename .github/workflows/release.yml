@@ -20,7 +20,13 @@ jobs:
 
       - name: Package Linux & Extension
         run: |
-          bash scripts/package-release.sh
+          if [[ "${GITHUB_REF_NAME:-}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 1.0.0)"
+          fi
+          echo "Packaging version: $VERSION"
+          bash scripts/package-release.sh "$VERSION"
 
       - name: Upload Linux & Extension Artifacts
         uses: actions/upload-artifact@v4
