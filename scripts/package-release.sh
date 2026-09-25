@@ -40,7 +40,7 @@ rm -rf "$TMP_STAGE"
 echo "--> Creating tabcircle-linux.tar.gz..."
 (
     cd "$PROJECT_DIR"
-    tar --exclude='__pycache__' --exclude='*.pyc' --exclude='.DS_Store' --exclude='*.mp4' \
+    tar --exclude='__pycache__' --exclude='*.pyc' --exclude='.DS_Store' --exclude='*.mp4' --exclude='*.gif' \
         -czf "$RELEASE_DIR/tabcircle-linux.tar.gz" \
         linux-helper/ assets/ scripts/install-linux.sh README.md LICENSE
 )
