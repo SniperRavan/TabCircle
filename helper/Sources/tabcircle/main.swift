@@ -99,7 +99,7 @@ MainActor.assumeIsolated {
             }
         }
         statusItem.onExtensionWarningClick = {
-            NSWorkspace.shared.open(URL(string: "https://www.sniperravan.com/TabCircle/install-extension.html")!)
+            NSWorkspace.shared.open(URL(string: "https://github.com/sniperravan/TabCircle#installation")!)
         }
 
         statusItem.onOpenSettings = {
@@ -286,7 +286,7 @@ MainActor.assumeIsolated {
                 alert.addButton(withTitle: "Later")
                 NSApp.activate(ignoringOtherApps: true)
                 if alert.runModal() == .alertFirstButtonReturn {
-                    NSWorkspace.shared.open(URL(string: "https://www.sniperravan.com/TabCircle/install-extension.html")!)
+                    NSWorkspace.shared.open(URL(string: "https://github.com/sniperravan/TabCircle#installation")!)
                 }
             }
         }

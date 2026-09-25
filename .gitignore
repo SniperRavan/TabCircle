@@ -7,8 +7,17 @@ AGENTS.md
 .aider*
 .github/copilot-instructions.md
 
-# Project management docs
+# Internal / scratch files
+TEMP_CHANGES_SUMMARY.md
+.semgrepignore
+.github/FUNDING.yml
+
+# Project management docs (private)
 docs/project_management/
+
+# Demo media (not distributed via repo)
+docs/demo-poster.jpg
+docs/demo.mp4
 
 # Python / Linux Helper
 __pycache__/

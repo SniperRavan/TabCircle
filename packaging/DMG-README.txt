@@ -49,4 +49,4 @@ TabCircle — Setup Guide
    certificate.
 
 ================================================================
-https://www.sniperravan.com/TabCircle/
+https://github.com/sniperravan/TabCircle

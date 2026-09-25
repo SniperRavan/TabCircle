@@ -270,7 +270,7 @@ private struct BrowserPane: View {
                         NSWorkspace.shared.open(URL(string: "https://github.com/sniperravan/TabCircle/releases/latest/download/TabCircle-Extension.zip")!)
                     }
                     Link(L10n.t("Install Guide"),
-                         destination: URL(string: "https://www.sniperravan.com/TabCircle/install-extension.html")!)
+                         destination: URL(string: "https://github.com/sniperravan/TabCircle#installation")!)
                         .font(.system(size: 11))
                 }
             }
@@ -817,17 +817,9 @@ private struct AboutPane: View {
                     }
                 }
                 .disabled(updates.status == .checking || updates.isDownloading)
-
-                Button {
-                    NSWorkspace.shared.open(URL(string: "https://www.sniperravan.com/sponsor/")!)
-                } label: {
-                    Label(L10n.t("Sponsor"), systemImage: "heart.fill")
-                }
             }
 
             HStack(spacing: 16) {
-                Link(L10n.t("Website"),
-                     destination: URL(string: "https://www.sniperravan.com/TabCircle/")!)
                 Link("GitHub",
                      destination: URL(string: "https://github.com/sniperravan/TabCircle")!)
                 Link(L10n.t("Report an Issue"),

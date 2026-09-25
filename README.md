@@ -13,19 +13,12 @@
 </p>
 
 <p align="center">
-  <a href="https://www.sniperravan.com/TabCircle/">🌐 <strong>Website</strong></a> ｜ <a href="#installation">🚀 <strong>Get Started</strong></a> ｜ <a href="https://www.sniperravan.com/sponsor/">💖 <strong>Sponsor</strong></a>
+  <a href="#installation">🚀 <strong>Get Started</strong></a> ｜ <a href="https://github.com/sniperravan/TabCircle">📦 <strong>GitHub</strong></a>
 </p>
 
 
 ---
 
-<p align="center">
-  <img src="https://cdn.jsdelivr.net/gh/sniperravan/images@master/uPic/2026/08/tabcircle-demo-full.gif" width="860" alt="TabCircle demo">
-</p>
-
-<p align="center">
-  <sub>Full-quality video on the <a href="https://www.sniperravan.com/TabCircle/">website</a>.</sub>
-</p>
 
 Chrome cycles tabs in tab-strip order. TabCircle makes ⌃⇥ cycle them by recent use and shows a switcher overlay while you hold the key, the same way ⌘⇥ works for applications.
 
@@ -273,10 +266,6 @@ gsettings set org.cinnamon.desktop.peripherals.mouse locate-pointer false
 TabCircle draws inspiration from:
 - **macOS `⌘⇥` & Arc Browser**: The fluid, responsive visual layout, typography, and card-based overlay design principles that make fast keyboard navigation feel native and effortless.
 - **Native Extension Companions**: Pairing MV3 browser extensions with native system daemons to achieve low-latency MRU tab switching with synchronous event interception and continuous squircle geometry.
-
-## Sponsor
-
-TabCircle is free and open source. If you find it useful, you can [sponsor its development](https://www.sniperravan.com/sponsor/) 💖
 
 ## License
 
