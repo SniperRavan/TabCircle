@@ -22,13 +22,19 @@ public struct PermissionFlowButton: View {
     }
 
     public var body: some View {
-        Button(title ?? LocalizedStringResource("permission_flow.button.grant", locale: locale, bundle: .atURL(Bundle.permissionFlowResources.bundleURL))) {
+        Button {
             controller.setLocaleIdentifier(locale.identifier)
             controller.authorize(
                 pane: pane,
                 suggestedAppURLs: suggestedAppURLs,
                 sourceFrameInScreen: clickSourceFrameInScreen()
             )
+        } label: {
+            if let title {
+                Text(title)
+            } else {
+                Text(LocalizedStringResource("permission_flow.button.grant", locale: locale, bundle: .atURL(Bundle.permissionFlowResources.bundleURL)))
+            }
         }
     }
 
