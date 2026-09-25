@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
 
-VERSION="${1:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 0.1.0)}"
+VERSION="${1:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 1.0.0)}"
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 
 BUILD_DIR="$ROOT/build"
@@ -48,8 +48,8 @@ build_one() {
 
     local linked_sdk
     linked_sdk=$(otool -l "$bin_dir/tabcircle" | awk '/LC_BUILD_VERSION/{f=1} f&&/sdk/{print $2; exit}')
-    if [ "${linked_sdk%%.*}" -lt 26 ] 2>/dev/null || [ -z "$linked_sdk" ]; then
-        echo "✗ [$arch] Linked SDK is ${linked_sdk:-unknown}, not host SDK ($(basename "$SDK_PATH"))"
+    if [ -z "$linked_sdk" ] || [ "${linked_sdk%%.*}" -lt 14 ] 2>/dev/null; then
+        echo "✗ [$arch] Linked SDK is ${linked_sdk:-unknown}, minimum supported SDK is 14.0"
         exit 1
     fi
 

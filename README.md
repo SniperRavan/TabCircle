@@ -69,119 +69,105 @@ Both halves are required:
 
 ## Installation
 
-### 1. Load the Browser Extension (All Platforms)
+Grab the files you need from [Releases](https://github.com/sniperravan/TabCircle/releases/latest) — no need to clone the repo.
 
-1. Open `chrome://extensions` or `brave://extensions` in your browser.
-2. Toggle on **Developer mode** in the top-right corner.
-3. Click **Load unpacked** (note: Chromium browsers require an extracted directory and cannot load `.zip` archives directly).
-4. If downloading from GitHub Releases, unzip `TabCircle-Extension.zip` into a permanent directory (e.g. `~/Documents/TabCircle-Extension`) and select the `TabCircle-Extension/` folder. If working from source, select the `extension/` repository folder.
+| File | What it is | Get it on |
+|---|---|---|
+| `TabCircle-Extension.zip` | The Chrome extension (unpacked folder: `manifest.json`, `background.js`, icons) | **Linux and macOS** |
+| `tabcircle-linux.tar.gz` | The Linux helper daemon + `install-linux.sh` | **Linux only** |
+| `TabCircle-<version>-arm64.dmg` | macOS app, Apple Silicon | **macOS (M1/M2/M3/M4)** |
+| `TabCircle-<version>-x86_64.dmg` | macOS app, Intel | **macOS (Intel)** |
 
----
+### 1. Load the browser extension (both platforms)
 
-### 2. Linux Setup (X11)
+1. Download and unzip `TabCircle-Extension.zip` somewhere permanent — e.g. `~/Documents/TabCircle-Extension` (moving or deleting this folder later will break the extension).
+2. Open `chrome://extensions` (or `brave://extensions`) and enable **Developer mode**.
+3. Click **Load unpacked** and select the unzipped `TabCircle-Extension/` folder.
 
-#### Requirements
-- Python 3.9+
-- X11 session (Cinnamon, GNOME on Xorg, KDE Plasma, XFCE, MATE, etc.)
-- Chromium browser (Brave, Chrome, Edge, Chromium, Vivaldi)
+### 2a. Linux setup (X11)
 
-#### Quick Automated Install (Recommended)
-Clone the repository and run the setup script:
+**Requires:** Python 3.9+, an X11 session (Cinnamon, GNOME on Xorg, KDE, XFCE, MATE), a Chromium-based browser.
+
+```bash
+# Download tabcircle-linux.tar.gz from the Releases page, then:
+tar -xzf tabcircle-linux.tar.gz
+cd tabcircle-linux    # or whatever the extracted folder is named
+./scripts/install-linux.sh
+```
+
+This installs `PyQt6`, `python-xlib`, and `websockets`; registers autostart at `~/.config/autostart/tabcircle.desktop`; and starts the helper.
+
+```bash
+./scripts/install-linux.sh --status      # check it's running
+./scripts/install-linux.sh --uninstall   # remove it
+```
+
+<details>
+<summary>Run manually instead (no autostart)</summary>
+
+```bash
+pip install -r linux-helper/requirements.txt
+python3 linux-helper/app.py
+```
+</details>
+
+<details>
+<summary>Low-resource mode (favicon-only, for weaker CPUs/battery)</summary>
+
+Disables screenshot capture on tab switch. Saves browser-side CPU during switching; does **not** reduce the helper's own ~50–80MB baseline (that's Python/Qt/X11, not thumbnails).
+
+```bash
+./scripts/install-linux.sh --low-resource
+# or toggle later and apply with:
+./scripts/install-linux.sh --restart
+```
+
+Precedence: `--low-resource`/`--no-low-resource` CLI flag > `~/.config/tabcircle/config.json` (`{"low_resource_mode": true}`) > default (off).
+</details>
+
+<details>
+<summary>Building from source instead</summary>
 
 ```bash
 git clone https://github.com/sniperravan/TabCircle.git
 cd TabCircle
 ./scripts/install-linux.sh
 ```
+</details>
 
-This installs the required dependencies (`PyQt6`, `python-xlib`, `websockets`), registers an autostart desktop entry (`~/.config/autostart/tabcircle.desktop`), and launches the helper in the background.
+### 2b. macOS setup
 
-*To check status or uninstall:*
-```bash
-./scripts/install-linux.sh --status
-./scripts/install-linux.sh --uninstall
-```
+**Requires:** macOS 14+, Chrome 116+.
 
-#### Low-Resource / Favicon-Only Mode
-For users on battery, lightweight laptops, or systems with weaker CPUs, you can disable viewport screenshot captures while keeping the full MRU tab switcher functionality:
-- **What it saves**: Eliminates browser-side CPU spikes on tab switches (completely bypasses `chrome.tabs.captureVisibleTab`, canvas allocations, and JPEG encoding) and saves ~2.5–5MB of image cache.
-- **What it does NOT change**: The Python helper baseline memory (~50–80MB RSS) remains standard, as it is consumed by the Python runtime, PyQt6, Qt rendering libraries, and X11 bindings.
-- **Automated setup**: Run `./scripts/install-linux.sh --low-resource` (or `./scripts/install-linux.sh --restart` to apply)
-- **Manual CLI**: Pass `--low-resource` (or `--no-low-resource` to force standard mode):
-  ```bash
-  python3 linux-helper/app.py --low-resource
-  ```
-- **Configuration file**: Set `"low_resource_mode": true` in `~/.config/tabcircle/config.json`:
-  ```json
-  {
-    "low_resource_mode": true
-  }
-  ```
-- **Precedence**: CLI flag (`--low-resource` / `--no-low-resource`) > Configuration file (`config.json`) > Default (`false`).
-*(Note: If you edit `config.json` manually while the daemon is running, restart it with `./scripts/install-linux.sh --restart` or click reload on the extension in `chrome://extensions`.)*
+1. Download the DMG matching your Mac (`arm64` for Apple Silicon, `x86_64` for Intel) from [Releases](https://github.com/sniperravan/TabCircle/releases/latest).
+2. Open the DMG and drag `TabCircle.app` to Applications.
+3. **First launch:** these builds aren't notarized by Apple, so Gatekeeper will block a normal double-click. Instead, **right-click `TabCircle.app` → Open**, then confirm in the dialog that appears. You only need to do this once. (If macOS still refuses, run `xattr -d com.apple.quarantine /Applications/TabCircle.app` in Terminal, then try again.)
+4. A guided overlay walks you through granting **Accessibility** access — needed because the helper intercepts Ctrl+Tab before Chrome sees it.
+5. Load the extension (Step 1 above). Future versions update themselves via GitHub Releases.
 
-#### Manual Execution
-If you prefer running without session autostart:
+<details>
+<summary>Building from source instead</summary>
+
+Requires Xcode Command Line Tools (`xcode-select --install`).
 
 ```bash
-pip install -r linux-helper/requirements.txt
-python3 linux-helper/app.py
-```
-
----
-
-### 3. macOS Setup
-
-#### Requirements
-- macOS 14 or later
-- Google Chrome 116 or later
-- Xcode Command Line Tools (source build only) — `xcode-select --install`
-
-#### Option A — Download the app (recommended)
-
-1. Grab the DMG for your Mac from [Releases](https://github.com/sniperravan/TabCircle/releases/latest): `arm64` for Apple Silicon, `x86_64` for Intel
-2. Drag **TabCircle.app** into **Applications** and launch it — a guided overlay walks you through granting Accessibility permission
-3. Load the extension (Step 1 above)
-4. Done. Future versions update themselves via GitHub Releases.
-
-#### Option B — Build from source
-
-```bash
-cd helper
+git clone https://github.com/sniperravan/TabCircle.git
+cd TabCircle/helper
 swift build -c release
 ./.build/release/tabcircle
 ```
 
-### 4. Grant Accessibility permission
+On first launch, macOS prompts for Accessibility access. Grant it to whatever launched the binary (Terminal, iTerm, etc.), then **fully quit and relaunch that app** — permissions are only read at process start. If `CGEvent.tapCreate` still fails, also enable it under **System Settings → Privacy & Security → Input Monitoring**.
 
-The helper installs a `CGEventTap` to intercept `Ctrl + Tab` (`⌃ + ⇥`) before Chrome receives it, which requires Accessibility access.
-
-Start it once:
-
-```bash
-./.build/release/tabcircle
-```
-
-macOS shows a permission prompt. Grant access to the app that launched the binary (Terminal, iTerm, and so on), then quit that app completely and reopen it — permissions are read at process launch.
-
-If `CGEvent.tapCreate` still fails, enable the same app under **System Settings → Privacy & Security → Input Monitoring** as well.
-
-### 5. Run
-
-```bash
-./.build/release/tabcircle
-```
-
-Startup output:
-
+A successful run looks like:
 ```
 [HH:MM:SS.mmm] tabcircle started — binary built ...
 [HH:MM:SS.mmm] WebSocket server listening → ws://127.0.0.1:41573/
 [HH:MM:SS.mmm] Keyboard hook installed — waiting for Ctrl+Tab in Chrome
 [HH:MM:SS.mmm] ✅ Extension connected (1 client(s))
 ```
+</details>
 
-The last line confirms the extension reached the helper.
 
 ## Usage
 

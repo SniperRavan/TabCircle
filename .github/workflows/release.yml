@@ -10,23 +10,101 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build & Publish Release
+  build-linux:
+    name: Build Linux & Extension
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Package Release Artifacts
+      - name: Package Linux & Extension
         run: |
           bash scripts/package-release.sh
+
+      - name: Upload Linux & Extension Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            release/TabCircle-Extension.zip
+            release/tabcircle-linux.tar.gz
+
+  build-macos:
+    name: Build macOS DMGs
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode 16
+        run: |
+          if [ -d "/Applications/Xcode_16.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.2.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+          fi
+          xcodebuild -version
+          swift --version
+
+      - name: Build macOS App & DMGs
+        run: |
+          if [[ "${GITHUB_REF_NAME:-}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 1.0.0)"
+          fi
+          echo "Building version: $VERSION"
+          bash scripts/build-app.sh "$VERSION"
+
+      - name: Upload macOS DMGs
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: build/TabCircle-*.dmg
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate Unified Checksums
+        run: |
+          cd release-assets
+          echo "--> Downloaded release assets:"
+          ls -lh
+          # Verify expected assets exist before hashing
+          for f in TabCircle-Extension.zip tabcircle-linux.tar.gz; do
+            if [ ! -f "$f" ]; then
+              echo "Error: Missing required artifact $f" >&2
+              exit 1
+            fi
+          done
+          sha256sum TabCircle-Extension.zip tabcircle-linux.tar.gz TabCircle-*.dmg > checksums.txt
+          echo "--> Generated checksums:"
+          cat checksums.txt
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/TabCircle-Extension.zip
-            release/tabcircle-linux.tar.gz
-            release/checksums.txt
+            release-assets/TabCircle-Extension.zip
+            release-assets/tabcircle-linux.tar.gz
+            release-assets/TabCircle-*.dmg
+            release-assets/checksums.txt
           generate_release_notes: true

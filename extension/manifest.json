@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TabCircle Bridge",
-  "version": "0.14.0",
+  "version": "1.0.1",
   "description": "Bridges the MRU tab order to the TabCircle helper and executes switch commands.",
   "permissions": [
     "tabs",
