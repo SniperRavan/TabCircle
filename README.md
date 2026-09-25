@@ -24,8 +24,8 @@
 ---
 
 <p align="center">
-  <video src="assets/demo-vid.mp4" controls="controls" muted="muted" width="860" style="max-width: 100%;">
-    <a href="assets/demo-vid.mp4">Watch Demo Video</a>
+  <video src="assets/demo-vid1.gif" controls="controls" muted="muted" width="860" style="max-width: 100%;">
+    <a href="assets/demo-vid1.gif">Watch Demo Video</a>
   </video>
 </p>
 
