@@ -16,9 +16,6 @@
   <a href="https://www.sniperravan.com/TabCircle/">🌐 <strong>Website</strong></a> ｜ <a href="#installation">🚀 <strong>Get Started</strong></a> ｜ <a href="https://www.sniperravan.com/sponsor/">💖 <strong>Sponsor</strong></a>
 </p>
 
-<p align="center">
-  <a href="README_zh.md">中文文档</a>
-</p>
 
 ---
 
@@ -50,8 +47,8 @@ TabCircle runs as two parts that talk over a loopback WebSocket:
 
 ```
 ┌─────────────────────────┐         ┌──────────────────────────┐
-│  Chrome extension (MV3) │  ws://  │  Swift helper            │
-│                         │◄───────►│                          │
+│  Chrome extension (MV3) │  loop   │  Swift helper            │
+│                         │◄──ws───►│                          │
 │  · tabs.onActivated     │  :41573 │  · CGEventTap  (⌃⇥)      │
 │    → maintain MRU order │         │  · NSPanel     (overlay) │
 │  · captureVisibleTab    │         │  · MRU state machine     │
@@ -68,45 +65,82 @@ Both halves are required:
 
 ## Installation
 
-### Requirements
+### 1. Load the Browser Extension (All Platforms)
 
-- macOS 14 or later
-- Google Chrome 116 or later
-- Xcode Command Line Tools (source build only) — `xcode-select --install`
+1. Open `chrome://extensions` or `brave://extensions` in your browser.
+2. Toggle on **Developer mode** in the top-right corner.
+3. Click **Load unpacked** (note: Chromium browsers require an extracted directory and cannot load `.zip` archives directly).
+4. If downloading from GitHub Releases, unzip `TabCircle-Extension.zip` into a permanent directory (e.g. `~/Documents/TabCircle-Extension`) and select the `TabCircle-Extension/` folder. If working from source, select the `extension/` repository folder.
 
-### Option 1 — Download the app (recommended)
+---
 
-1. Grab the DMG for your Mac from [Releases](https://github.com/sniperravan/TabCircle/releases/latest): `arm64` for Apple Silicon, `x86_64` for Intel
-2. Drag **TabCircle.app** into **Applications** and launch it — a guided overlay walks you through granting Accessibility permission
-3. Load the extension (step 3 below) — this part is always required
-4. Done. Future versions update themselves: TabCircle checks GitHub Releases on your chosen schedule and installs in place after one click
+### 2. Linux Setup (X11)
 
-### Option 2 — Build from source
+#### Requirements
+- Python 3.9+
+- X11 session (Cinnamon, GNOME on Xorg, KDE Plasma, XFCE, MATE, etc.)
+- Chromium browser (Brave, Chrome, Edge, Chromium, Vivaldi)
 
-### 1. Clone the repository
+#### Quick Automated Install (Recommended)
+Clone the repository and run the setup script:
 
 ```bash
 git clone https://github.com/sniperravan/TabCircle.git
 cd TabCircle
+./scripts/install-linux.sh
 ```
 
-### 2. Build the helper
+This installs the required dependencies (`PyQt6`, `python-xlib`, `websockets`), registers an autostart desktop entry (`~/.config/autostart/tabcircle.desktop`), and launches the helper in the background.
+
+*To check status or uninstall:*
+```bash
+./scripts/install-linux.sh --status
+./scripts/install-linux.sh --uninstall
+```
+
+#### Low-Resource / Favicon-Only Mode (Minimal RAM & CPU)
+For lightweight environments or machines with lower RAM, you can disable viewport screenshot captures while keeping the full MRU tab switcher functionality:
+- **Automated setup**: Run `./scripts/install-linux.sh --low-resource`
+- **Manual CLI**: Pass `--low-resource` when running `python3 linux-helper/app.py --low-resource`
+- **Configuration file**: Set `"low_resource_mode": true` in `~/.config/tabcircle/config.json`:
+  ```json
+  {
+    "low_resource_mode": true
+  }
+  ```
+In this mode, the extension completely bypasses `captureVisibleTab` and canvas encoding, and the overlay renders high-contrast, beautiful favicon cards.
+
+#### Manual Execution
+If you prefer running without session autostart:
+
+```bash
+pip install -r linux-helper/requirements.txt
+python3 linux-helper/app.py
+```
+
+---
+
+### 3. macOS Setup
+
+#### Requirements
+- macOS 14 or later
+- Google Chrome 116 or later
+- Xcode Command Line Tools (source build only) — `xcode-select --install`
+
+#### Option A — Download the app (recommended)
+
+1. Grab the DMG for your Mac from [Releases](https://github.com/sniperravan/TabCircle/releases/latest): `arm64` for Apple Silicon, `x86_64` for Intel
+2. Drag **TabCircle.app** into **Applications** and launch it — a guided overlay walks you through granting Accessibility permission
+3. Load the extension (Step 1 above)
+4. Done. Future versions update themselves via GitHub Releases.
+
+#### Option B — Build from source
 
 ```bash
 cd helper
 swift build -c release
+./.build/release/tabcircle
 ```
-
-The binary is written to `helper/.build/release/tabcircle`.
-
-> During development, `swift build` / `swift run` (debug) compile much faster.
-
-### 3. Load the extension
-
-1. Open `chrome://extensions`
-2. Turn on **Developer mode** (top right)
-3. Click **Load unpacked**
-4. Select the `extension/` folder of this repository
 
 ### 4. Grant Accessibility permission
 
@@ -165,7 +199,7 @@ Open the settings window from the menu bar icon (**Settings…**, or ⌘, while 
 | Limit switching to the current window | On | The switcher lists only the tabs of the Chrome window in use. Turn it off to cycle through every window's tabs in one list. |
 | Switcher layout | Horizontal strip | Grid wraps the cards so every tab fits on one screen; ⌃↑/⌃↓ then move by row. |
 | Check for updates | Daily | Automatic update checks: daily / weekly / never. Updates download, install in place, and relaunch after you confirm. |
-| Language / Appearance / Open at Login | — | Interface language (中文/English), light/dark override, launch at login. |
+| Language / Appearance / Open at Login | — | Interface language, light/dark override, launch at login. |
 
 Each window keeps its own history either way. Switching the scope setting off merges the lists for display; it does not discard anything.
 
@@ -186,7 +220,12 @@ A freshly started helper has an empty first section, so the list initially match
 
 ## Troubleshooting
 
-Start with the helper log at `~/Library/Logs/TabCircle/tabcircle.log`, which is also printed to the terminal. It is truncated on every launch, so it always describes the current run.
+Start with the helper log:
+- **Linux**: `~/.cache/tabcircle/helper.log` (automatically rotated up to 15MB, also printed to terminal stdout)
+- **macOS**: `~/Library/Logs/TabCircle/tabcircle.log` (also printed to terminal stdout)
+
+Tab cache storage:
+- **Linux**: `/tmp/tabcircle/tabs_cache.json` (instant tab recovery on restart, managed in system temp directory)
 
 ### ⌃⇥ does nothing
 
@@ -212,7 +251,22 @@ Chrome shows this notice for any unpacked extension. It does not affect TabCircl
 
 ### The overlay opens on the wrong display
 
-The overlay follows the frontmost Chrome window. With windows on several displays, the one most recently in front is used.
+The overlay follows the frontmost Chrome window. With windows on several displays, the active display is dynamically detected via XRandR output matching.
+
+### Linux: Cinnamon "Locate Pointer" Interaction
+
+On Cinnamon desktops with "Show position of pointer when the Control key is pressed" (`locate-pointer`) enabled, Cinnamon places a synchronous grab on `Control` at the root window. When `Ctrl+Tab` is pressed, Cinnamon replays the event via `XReplayKeyboard`, which by X11 specification skips root-level passive grabs.
+
+TabCircle implements **dynamic window-targeted passive grabs** attached directly to the active browser window upon focus changes (`_NET_ACTIVE_WINDOW`), ensuring native interception. If you ever experience issues on older desktop environments:
+```bash
+gsettings set org.cinnamon.desktop.peripherals.mouse locate-pointer false
+```
+
+## Acknowledgements & Inspirations
+
+TabCircle draws inspiration from:
+- **[TabFlick](https://github.com/lifedever)** by lifedever: Pioneered the concept of pairing an MV3 Chromium browser extension with a native companion daemon for fast MRU tab switching on macOS. TabCircle takes this workflow inspiration and reimplements the system natively for Linux (X11, PyQt6, Chromium/Brave) featuring low-level synchronous event interception, real-time pixel luminance sampling, and continuous squircle geometry.
+- **macOS `⌘⇥` & Arc Browser**: The fluid, responsive visual layout, typography, and card-based overlay design principles that make fast keyboard navigation feel native and effortless.
 
 ## Sponsor
 

@@ -1,20 +1,20 @@
-// ClosedTabStore.merging 的规则校验。
+// Rule validation for ClosedTabStore.merging.
 //
-// 跑法（在 helper/ 下）：
+// Running (under helper/):
 //   swiftc -parse-as-library Sources/tabcircle/ClosedTabStore.swift \
 //          Sources/tabcircle/L10n.swift Sources/tabcircle/Log.swift \
-//          checks/closed-tab-store-check.swift -o /tmp/closedcheck && /tmp/closedcheck
+//          checks/closed-tab-store-check.swift -o ./closedcheck && ./closedcheck
 //
-// 为什么单独校验：合并要同时满足四条互相交织的规则 —— 降序、同（浏览器+URL）
-// 去重保留最新、丢过期、截上限。任何一条写错都是**静默**的：列表里少几条、
-// 或者旧的顶掉新的，没有任何报错。
+// Rationale: Merging must simultaneously satisfy four intertwined rules: descending order,
+// deduplication per (browser + URL) keeping the freshest, pruning expired entries, and capping limits.
+// Any logic error fails silently: items are omitted from lists or old items overwrite new ones without errors.
 //
-// 只测静态纯函数 `merging`，绝不实例化 ClosedTabStore —— 那会直接读写用户
-// 真实的 ~/Library/Application Support/TabCircle/closed-tabs.json。
+// Tests only the pure static function `merging`, never instantiating ClosedTabStore to avoid
+// touching actual user storage.
 
 import Foundation
 
-let NOW: Double = 1_700_000_000_000     // 固定基准，不依赖真实时钟
+let NOW: Double = 1_700_000_000_000     // Fixed reference time, independent of system clock
 let DAY: Double = 86_400 * 1000
 let MAX_AGE: TimeInterval = 30 * 86_400
 let MAX_ENTRIES = 1000
@@ -46,111 +46,110 @@ func check(_ name: String, _ condition: Bool, _ detail: @autoclosure () -> Strin
 struct Check {
 static func main() {
 
-// ── 降序 ────────────────────────────────────────────────────────────────
-print("结果按关闭时间降序")
+// ── Descending Order ───────────────────────────────────────────────────
+print("Results sorted in descending order by closed time")
 do {
     let out = merge([], [tab("https://old/", daysAgo: 5),
                          tab("https://new/", daysAgo: 1),
                          tab("https://mid/", daysAgo: 3)])
-    check("最新的在最前", out.first?.url == "https://new/", "得到 \(out.map(\.url))")
-    check("最旧的在最后", out.last?.url == "https://old/")
-    check("一条不少", out.count == 3)
+    check("Newest at the front", out.first?.url == "https://new/", "got \(out.map(\.url))")
+    check("Oldest at the end", out.last?.url == "https://old/")
+    check("No items lost", out.count == 3)
 }
 
-// ── 去重 ────────────────────────────────────────────────────────────────
-print("同一浏览器下同 URL 只留最新的一条")
+// ── Deduplication ───────────────────────────────────────────────────────
+print("Same URL under same browser keeps only the freshest entry")
 do {
-    let out = merge([tab("https://a/", daysAgo: 5, title: "旧的")],
-                    [tab("https://a/", daysAgo: 1, title: "新的")])
-    check("只剩一条", out.count == 1, "得到 \(out.count) 条")
-    check("留下的是新的", out.first?.title == "新的", "留下了 \(out.first?.title ?? "?")")
+    let out = merge([tab("https://a/", daysAgo: 5, title: "Old")],
+                    [tab("https://a/", daysAgo: 1, title: "New")])
+    check("Only one left", out.count == 1, "got \(out.count) entries")
+    check("Newer one kept", out.first?.title == "New", "retained \(out.first?.title ?? "?")")
 }
 
-print("送进来的比库里的还旧时，留库里那条（时钟回拨也不该让旧的顶掉新的）")
+print("Incoming entry older than existing entry: keep existing (clock skew must not overwrite)")
 do {
-    let out = merge([tab("https://a/", daysAgo: 1, title: "新的")],
-                    [tab("https://a/", daysAgo: 5, title: "旧的")])
-    check("留下的仍是新的", out.first?.title == "新的", "留下了 \(out.first?.title ?? "?")")
+    let out = merge([tab("https://a/", daysAgo: 1, title: "New")],
+                    [tab("https://a/", daysAgo: 5, title: "Old")])
+    check("Newer one still kept", out.first?.title == "New", "retained \(out.first?.title ?? "?")")
 }
 
-print("同一批里就有重复时也只留最新（顺序不影响结果）")
+print("Duplicates within the same batch keep only newest (order-independent)")
 do {
-    let forward = merge([], [tab("https://a/", daysAgo: 5, title: "旧的"),
-                             tab("https://a/", daysAgo: 1, title: "新的")])
-    let reverse = merge([], [tab("https://a/", daysAgo: 1, title: "新的"),
-                             tab("https://a/", daysAgo: 5, title: "旧的")])
-    check("正序：留新的", forward.first?.title == "新的")
-    check("逆序：也留新的", reverse.first?.title == "新的",
-          "逆序留下了 \(reverse.first?.title ?? "?")")
+    let forward = merge([], [tab("https://a/", daysAgo: 5, title: "Old"),
+                             tab("https://a/", daysAgo: 1, title: "New")])
+    let reverse = merge([], [tab("https://a/", daysAgo: 1, title: "New"),
+                             tab("https://a/", daysAgo: 5, title: "Old")])
+    check("Ascending: keep newest", forward.first?.title == "New")
+    check("Descending: also keep newest", reverse.first?.title == "New",
+          "reversed retained \(reverse.first?.title ?? "?")")
 }
 
-print("不同浏览器的同一个 URL 是两条，各记各的（浏览器物理隔离）")
+print("Same URL across different browsers keeps both (browser isolation)")
 do {
     let out = merge([], [tab("https://a/", "chrome", daysAgo: 1),
                          tab("https://a/", "quark", daysAgo: 2)])
-    check("两条都在", out.count == 2, "得到 \(out.count) 条")
+    check("Both present", out.count == 2, "got \(out.count) entries")
 }
 
-// ── 过期 ────────────────────────────────────────────────────────────────
-print("超过 30 天的丢掉")
+// ── Expiration ─────────────────────────────────────────────────────────
+print("Discard entries older than 30 days")
 do {
     let out = merge([tab("https://ancient/", daysAgo: 31)],
                     [tab("https://fresh/", daysAgo: 29)])
-    check("31 天前的没了", !out.contains { $0.url == "https://ancient/" }, "得到 \(out.map(\.url))")
-    check("29 天前的还在", out.contains { $0.url == "https://fresh/" })
+    check("31 days ago discarded", !out.contains { $0.url == "https://ancient/" }, "got \(out.map(\.url))")
+    check("29 days ago preserved", out.contains { $0.url == "https://fresh/" })
 }
 
-print("过期的挡在中间时，后面更新的不会被连坐（降序 + break 的边界）")
+print("Expired entry in middle does not prune newer entries after it")
 do {
-    // 故意把过期那条排在输入的最前面 —— 排序没做对的话 break 会砍掉后面全部
     let out = merge([], [tab("https://ancient/", daysAgo: 40),
                          tab("https://fresh/", daysAgo: 1)])
-    check("新的活下来了", out.contains { $0.url == "https://fresh/" }, "得到 \(out.map(\.url))")
-    check("旧的被丢掉", out.count == 1, "得到 \(out.count) 条")
+    check("New entry survived", out.contains { $0.url == "https://fresh/" }, "got \(out.map(\.url))")
+    check("Old entry discarded", out.count == 1, "got \(out.count) entries")
 }
 
-// ── 上限 ────────────────────────────────────────────────────────────────
-print("超出上限时砍掉最旧的那些")
+// ── Limit ──────────────────────────────────────────────────────────────
+print("Prune oldest entries when exceeding max entries")
 do {
     let many = (0..<50).map { tab("https://s\($0)/", daysAgo: Double($0) * 0.1) }
     let out = merge([], many, maxEntries: 10)
-    check("正好 10 条", out.count == 10, "得到 \(out.count) 条")
-    check("留下的是最新的 10 条", out.allSatisfy { url in
+    check("Exactly 10 entries", out.count == 10, "got \(out.count) entries")
+    check("Freshest 10 retained", out.allSatisfy { url in
         (0..<10).map { "https://s\($0)/" }.contains(url.url)
-    }, "得到 \(out.map(\.url))")
-    check("最旧的被砍掉", !out.contains { $0.url == "https://s49/" })
+    }, "got \(out.map(\.url))")
+    check("Oldest pruned", !out.contains { $0.url == "https://s49/" })
 }
 
-print("新来的一条能把库里最旧的挤出去（不是「满了就不收」）")
+print("New incoming entry evicts oldest (not 'reject when full')")
 do {
     let full = (0..<10).map { tab("https://s\($0)/", daysAgo: Double($0 + 1)) }
     let out = merge(full, [tab("https://brand-new/", daysAgo: 0)], maxEntries: 10)
-    check("仍是 10 条", out.count == 10, "得到 \(out.count) 条")
-    check("新的在最前", out.first?.url == "https://brand-new/", "首条是 \(out.first?.url ?? "?")")
-    check("最旧的被挤出", !out.contains { $0.url == "https://s9/" }, "得到 \(out.map(\.url))")
+    check("Still 10 entries", out.count == 10, "got \(out.count) entries")
+    check("Newest at front", out.first?.url == "https://brand-new/", "first is \(out.first?.url ?? "?")")
+    check("Oldest evicted", !out.contains { $0.url == "https://s9/" }, "got \(out.map(\.url))")
 }
 
-// ── 字段规范化 ──────────────────────────────────────────────────────────
-print("超长标题在构造时就被截断（title 完全由网页控制）")
+// ── Field Normalization ────────────────────────────────────────────────
+print("Ultra-long title truncated at instantiation (title is web-controlled)")
 do {
-    let long = String(repeating: "标", count: 5000)
+    let long = String(repeating: "T", count: 5000)
     let t = ClosedTab(url: "https://a/", title: long, favIconUrl: "",
                       browser: "chrome", reason: .manual, closedAt: NOW)
-    check("截到上限", t.title.count == ClosedTab.maxTitleLength, "长度 \(t.title.count)")
+    check("Truncated to max limit", t.title.count == ClosedTab.maxTitleLength, "length \(t.title.count)")
 }
 
-print("认不出的 reason 解码成 manual，不让整份存档陪葬")
+print("Unrecognized reason decoded as manual to preserve entire archive")
 do {
     let json = """
     [{"id":"x","url":"https://a/","title":"t","favIconUrl":"","browser":"chrome",\
     "reason":"from-the-future","closedAt":\(NOW)}]
     """
     let decoded = try? JSONDecoder().decode([ClosedTab].self, from: Data(json.utf8))
-    check("整份没解码失败", decoded?.count == 1, "得到 \(decoded?.count ?? -1) 条")
-    check("原因退回 manual", decoded?.first?.reason == .manual)
+    check("Entire archive decoded successfully", decoded?.count == 1, "got \(decoded?.count ?? -1) entries")
+    check("Reason fell back to manual", decoded?.first?.reason == .manual)
 }
 
-print(failures == 0 ? "\n全部通过" : "\n\(failures) 项失败")
+print(failures == 0 ? "\nAll passed" : "\n\(failures) failed")
 exit(failures == 0 ? 0 : 1)
 }
 }

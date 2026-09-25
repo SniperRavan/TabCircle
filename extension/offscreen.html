@@ -2,9 +2,9 @@
 <meta charset="utf-8">
 <title>TabCircle connection</title>
 <!--
-  这个页面永远不会被显示。它存在的唯一理由是持有一条到 helper 的 WebSocket
-  连接：MV3 的 service worker 空闲 30 秒就会被回收，而被回收的 SW 无法主动
-  重连 —— 只能等下一个浏览器事件把它唤醒。offscreen document 不受这个生命
-  周期约束，可以一直挂着连接，并在消息到达时反过来唤醒 SW。
+  This page is never displayed. Its purpose is to maintain a persistent
+  WebSocket connection to the helper: MV3 service workers are terminated after
+  30 seconds of inactivity. An offscreen document maintains the connection and
+  wakes up the service worker when messages arrive.
 -->
 <script src="offscreen.js"></script>

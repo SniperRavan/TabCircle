@@ -1,11 +1,10 @@
 import Foundation
 
-/// 发布说明的解析。
+/// Release notes parser.
 ///
-/// 单独成文件、只依赖 Foundation，是为了能脱离 app 单独编译验证
-/// （`helper/checks/release-notes-check.swift`）。输入是**手写的 markdown**
-/// 而不是结构化数据：挑错段落用户会看到另一种语言，挑漏了会看到一个空窗 ——
-/// 两种都不报错，只能靠对着真实发布过的说明跑用例。
+/// Isolated in a standalone file with Foundation-only dependencies so it can be compiled
+/// and verified independently (`helper/checks/release-notes-check.swift`). Input is handwritten
+/// markdown rather than structured data, requiring robust tests against realistic samples.
 enum ReleaseNotesParser {
 
     enum Block: Equatable {
@@ -14,11 +13,11 @@ enum ReleaseNotesParser {
         case paragraph(String)
     }
 
-    /// 从双语说明里挑出一段。
+    /// Extracts a specific section from release notes matching the given heading.
     ///
-    /// 发布说明的结构是「## 更新内容 …… ## What's New …… ### Download 表格」。
-    /// 挑错段落用户就会看到另一种语言，下载表格则完全没必要出现在 app 里。
-    /// 认不出结构时退回整篇（去掉下载表格）—— 宁可排版糙点，也不能白弹一个空窗。
+    /// General structure: `## Section Heading ... ### Download table`.
+    /// Download tables are excluded from UI display. When a heading is not matched,
+    /// falls back to the full text minus download tables.
     static func section(from body: String, heading: String) -> String {
         var collected: [String] = []
         var capturing = false
@@ -29,7 +28,7 @@ enum ReleaseNotesParser {
             if line.hasPrefix("#") {
                 sawAnyHeading = true
                 let title = normalized(line.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces))
-                if title.contains(normalized("Download")) { break }   // 下载表格及其之后一律不要
+                if title.contains(normalized("Download")) { break }   // Exclude download table and everything following it
                 capturing = (title == normalized(heading))
                 continue
             }
@@ -37,7 +36,7 @@ enum ReleaseNotesParser {
         }
 
         if collected.isEmpty {
-            // 没认出想要的小标题：整篇拿来用，但仍然砍掉下载表格
+            // Unrecognized heading: use full body, but still strip the download table
             let all = body.components(separatedBy: .newlines)
             if let cut = all.firstIndex(where: {
                 $0.trimmingCharacters(in: .whitespaces).hasPrefix("#")
@@ -47,20 +46,20 @@ enum ReleaseNotesParser {
             } else {
                 collected = all
             }
-            // 整篇兜底时，小标题自己也留着当分隔
+            // During fallback, preserve headings as visual separators
             if sawAnyHeading { collected = collected.filter { !$0.hasPrefix("#") } }
         }
         return collected.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// 弯引号、大小写都归一 —— 说明是手写的，'What's New' 里那撇随时可能变成 ’。
+    /// Normalize curly quotes and case sensitivity in handwritten markdown headings.
     private static func normalized(_ s: any StringProtocol) -> String {
         s.lowercased()
             .replacingOccurrences(of: "\u{2019}", with: "'")
             .replacingOccurrences(of: "\u{2018}", with: "'")
     }
 
-    /// 切成可渲染的块。只认发布说明里真正用到的三种：列表项、引用块、普通段落。
+    /// Chunks section into renderable blocks: bullets, callouts, and paragraphs.
     static func blocks(from section: String) -> [Block] {
         var result: [Block] = []
         for raw in section.components(separatedBy: .newlines) {
@@ -72,7 +71,7 @@ enum ReleaseNotesParser {
                 let text = line.dropFirst().trimmingCharacters(in: .whitespaces)
                 if !text.isEmpty { result.append(.callout(text)) }
             } else if line.hasPrefix("|") || line.hasPrefix("---") {
-                continue   // 表格残留，不渲染
+                continue   // Markdown table remnants, do not render
             } else {
                 result.append(.paragraph(line))
             }

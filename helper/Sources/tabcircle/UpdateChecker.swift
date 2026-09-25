@@ -1,16 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// 通过 GitHub Releases 检查并**自动安装**新版本。
+/// Checks for updates via GitHub Releases and automatically installs new versions.
 ///
-/// 机制照搬 PasteMemo 的更新器：下载当前架构的 DMG → 校验字节数 → 挂载 →
-/// 用 shell 脚本**原地替换 .app 的内容**（保持 bundle 路径与身份，辅助功能
-/// 授权跟着证书 + bundle ID 走，不会丢）→ 重新启动。
-///
-/// 脚本里删除/拷贝资源 bundle 一律 glob，绝不写死名字 —— updater 脚本是
-/// 编译进当前版本的，一旦写死某个 bundle 名发出去，将来新增 SPM 依赖时
-/// 旧 updater 会漏拷新 bundle，而且已装旧版的用户没法远程修复
-/// （PasteMemo issue #38）。
+/// Downloads the appropriate DMG for the current architecture, verifies byte size, mounts the volume,
+/// replaces the `.app` contents in-place (preserving bundle path and accessibility permissions), and relaunches.
 @MainActor
 final class UpdateChecker: ObservableObject {
 
@@ -33,8 +27,7 @@ final class UpdateChecker: ObservableObject {
     @Published private(set) var downloadProgress: Double = 0
     @Published private(set) var pendingVersion = ""
 
-    /// 自动检查频率。事实源在 AppSettings，这里只在到点对账时现读，
-    /// 所以设置改动立即生效，不需要重建计时器。
+    /// Automatic update check frequency.
     var frequency: () -> UpdateCheckFrequency = { .daily }
 
     private var downloadTask: URLSessionDownloadTask?
@@ -47,7 +40,7 @@ final class UpdateChecker: ObservableObject {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
     }
 
-    // MARK: - 检查
+    // MARK: - Check
 
     func check(userInitiated: Bool) {
         guard status != .checking, !isDownloading else { return }
@@ -65,7 +58,6 @@ final class UpdateChecker: ObservableObject {
             case .success(let release):
                 if isNewer(release.version, than: currentVersion) {
                     status = .available(version: release.version)
-                    // 自动检查尊重「跳过此版本」；手动检查永远弹
                     let skipped = UserDefaults.standard.string(forKey: Self.skippedKey)
                     if userInitiated || release.version != skipped {
                         presentAvailable(release)
@@ -78,7 +70,7 @@ final class UpdateChecker: ObservableObject {
         }
     }
 
-    /// 周期检查：每小时对一次账，到期才真的查。改频率、睡醒补查都自然覆盖。
+    /// Periodic checks: evaluates schedule hourly.
     func startPeriodicChecks() {
         periodicTimer?.invalidate()
         let timer = Timer(timeInterval: 3600, repeats: true) { [weak self] _ in
@@ -87,7 +79,6 @@ final class UpdateChecker: ObservableObject {
         RunLoop.main.add(timer, forMode: .common)
         periodicTimer = timer
 
-        // 启动后稍等再对账，别抢启动窗口
         DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
             self?.checkIfDue()
         }
@@ -100,11 +91,10 @@ final class UpdateChecker: ObservableObject {
         check(userInitiated: false)
     }
 
-    // MARK: - 网络
+    // MARK: - Networking
 
     private struct Latest {
         let version: String
-        /// 当前架构的 DMG 资产；发布时漏传该架构的包时为 nil，降级到发布页。
         let assetURL: URL?
         let assetSize: Int64
     }
@@ -124,20 +114,18 @@ final class UpdateChecker: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
 
-            // 一个 release 都还没发时 GitHub 返回 404，这不是错误
             if code == 404 {
                 return .success(Latest(version: "0.0.0", assetURL: nil, assetSize: 0))
             }
             guard code == 200 else {
-                return .failure(L10n.t("GitHub 返回 \(code)", "GitHub returned \(code)"))
+                return .failure("GitHub returned \(code)")
             }
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let tag = json["tag_name"] as? String else {
-                return .failure(L10n.t("无法解析发布信息", "Could not parse the release info"))
+                return .failure("Could not parse the release info")
             }
             let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
 
-            // 找当前架构的 DMG。资产名形如 TabCircle-0.2.0-arm64.dmg
             #if arch(arm64)
             let arch = "arm64"
             #else
@@ -159,7 +147,7 @@ final class UpdateChecker: ObservableObject {
         }
     }
 
-    /// 逐段比较数字版本号。字符串比较会把 "0.10.0" 判成小于 "0.9.0"。
+    /// Compares dot-separated numerical version strings.
     private func isNewer(_ remote: String, than current: String) -> Bool {
         let a = remote.split(separator: ".").map { Int($0) ?? 0 }
         let b = current.split(separator: ".").map { Int($0) ?? 0 }
@@ -171,7 +159,7 @@ final class UpdateChecker: ObservableObject {
         return false
     }
 
-    // MARK: - 下载
+    // MARK: - Download
 
     private func startDownload(_ latest: Latest) {
         guard let url = latest.assetURL, !isDownloading else { return }
@@ -214,35 +202,31 @@ final class UpdateChecker: ObservableObject {
         case .success(let fileURL):
             installAndRestart(from: fileURL)
         case .failure(let message):
-            guard !downloadCancelled else { return }   // 用户主动取消，别再弹错误
+            guard !downloadCancelled else { return }
             presentInstallFailure(message)
         }
     }
 
-    // MARK: - 安装
+    // MARK: - Installation
 
     private func installAndRestart(from dmg: URL) {
         let destApp = Bundle.main.bundlePath
-        // swift run 之类的非 .app 环境没有可替换的 bundle，别把 .build 目录搅了
         guard destApp.hasSuffix(".app") else {
             NSWorkspace.shared.open(dmg)
             return
         }
 
         guard let mountPoint = Self.mountDMG(at: dmg.path) else {
-            presentInstallFailure(L10n.t("更新包无法打开", "The update image could not be opened"))
+            presentInstallFailure("The update image could not be opened")
             return
         }
         let sourceApp = "\(mountPoint)/TabCircle.app"
         guard FileManager.default.fileExists(atPath: sourceApp) else {
             Self.detachDMG(mountPoint)
-            presentInstallFailure(L10n.t("更新包内容不完整", "The update image is missing the app"))
+            presentInstallFailure("The update image is missing the app")
             return
         }
 
-        // 只替换内容、不动 .app 目录本身：bundle 的路径与身份保持不变，
-        // 辅助功能授权（证书 + bundle ID）跟着保住。_CodeSignature 必须和
-        // 它封印的内容一起换，否则签名校验从此失败。
         let script = """
         #!/bin/bash
         sleep 2
@@ -303,16 +287,15 @@ final class UpdateChecker: ObservableObject {
         process.waitUntilExit()
     }
 
-    // MARK: - 进度窗口
+    // MARK: - Progress Window
 
     private func showProgressWindow() {
         if progressWindow == nil {
             let host = NSHostingController(rootView: DownloadProgressView(updates: self))
             let w = NSWindow(contentViewController: host)
-            w.styleMask = [.titled]           // 不给关闭按钮，取消走窗口里的按钮
-            w.title = L10n.t("软件更新", "Software Update")
+            w.styleMask = [.titled]
+            w.title = "Software Update"
             w.isReleasedWhenClosed = false
-            // 先布局定尺寸再居中（PasteMemo #66：反过来会以近零尺寸居中）
             host.view.layoutSubtreeIfNeeded()
             w.setContentSize(host.view.fittingSize)
             w.center()
@@ -327,7 +310,7 @@ final class UpdateChecker: ObservableObject {
         progressWindow = nil
     }
 
-    // MARK: - 提示
+    // MARK: - Presentation Dialogs
 
     private func activate() {
         NSApp.activate(ignoringOtherApps: true)
@@ -336,16 +319,13 @@ final class UpdateChecker: ObservableObject {
     private func presentAvailable(_ latest: Latest) {
         activate()
         let alert = NSAlert()
-        alert.messageText = L10n.t("有新版本 \(latest.version)", "Version \(latest.version) is available")
+        alert.messageText = "Version \(latest.version) is available"
 
         if latest.assetURL != nil {
-            alert.informativeText = L10n.t(
-                "当前版本 \(currentVersion)。点「下载并安装」，装完自动重启。",
-                "You have \(currentVersion). Download and install — it restarts on its own."
-            )
-            alert.addButton(withTitle: L10n.t("下载并安装", "Download & Install"))
-            alert.addButton(withTitle: L10n.t("稍后", "Later"))
-            alert.addButton(withTitle: L10n.t("跳过此版本", "Skip This Version"))
+            alert.informativeText = "You have \(currentVersion). Download and install — it restarts on its own."
+            alert.addButton(withTitle: "Download & Install")
+            alert.addButton(withTitle: "Later")
+            alert.addButton(withTitle: "Skip This Version")
             switch alert.runModal() {
             case .alertFirstButtonReturn:
                 startDownload(latest)
@@ -355,13 +335,9 @@ final class UpdateChecker: ObservableObject {
                 break
             }
         } else {
-            // 这一版的 release 缺当前架构的 DMG，退回发布页手动下载
-            alert.informativeText = L10n.t(
-                "当前版本 \(currentVersion)。这一版没有适合这台 Mac 的安装包，去发布页手动下载。",
-                "You have \(currentVersion). This release has no package for this Mac — grab one from the releases page."
-            )
-            alert.addButton(withTitle: L10n.t("前往下载", "Open Download Page"))
-            alert.addButton(withTitle: L10n.t("稍后", "Later"))
+            alert.informativeText = "You have \(currentVersion). This release has no package for this Mac — grab one from the releases page."
+            alert.addButton(withTitle: "Open Download Page")
+            alert.addButton(withTitle: "Later")
             if alert.runModal() == .alertFirstButtonReturn {
                 NSWorkspace.shared.open(Self.releasesPage)
             }
@@ -371,9 +347,9 @@ final class UpdateChecker: ObservableObject {
     private func presentUpToDate() {
         activate()
         let alert = NSAlert()
-        alert.messageText = L10n.t("已是最新版本", "You're up to date")
-        alert.informativeText = L10n.t("当前版本 \(currentVersion)。", "TabCircle \(currentVersion) is the latest version.")
-        alert.addButton(withTitle: L10n.t("好", "OK"))
+        alert.messageText = "You're up to date"
+        alert.informativeText = "TabCircle \(currentVersion) is the latest version."
+        alert.addButton(withTitle: "OK")
         alert.runModal()
     }
 
@@ -381,9 +357,9 @@ final class UpdateChecker: ObservableObject {
         activate()
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = L10n.t("检查更新失败", "Could not check for updates")
+        alert.messageText = "Could not check for updates"
         alert.informativeText = message
-        alert.addButton(withTitle: L10n.t("好", "OK"))
+        alert.addButton(withTitle: "OK")
         alert.runModal()
     }
 
@@ -391,28 +367,24 @@ final class UpdateChecker: ObservableObject {
         activate()
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = L10n.t("自动更新失败", "Automatic update failed")
-        alert.informativeText = message + L10n.t(
-            "\n\n可以去发布页手动下载。",
-            "\n\nYou can download it manually from the releases page."
-        )
-        alert.addButton(withTitle: L10n.t("前往下载", "Open Download Page"))
-        alert.addButton(withTitle: L10n.t("稍后", "Later"))
+        alert.messageText = "Automatic update failed"
+        alert.informativeText = message + "\n\nYou can download it manually from the releases page."
+        alert.addButton(withTitle: "Open Download Page")
+        alert.addButton(withTitle: "Later")
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.open(Self.releasesPage)
         }
     }
 }
 
-// MARK: - 下载进度视图
+// MARK: - Download Progress View
 
 private struct DownloadProgressView: View {
     @ObservedObject var updates: UpdateChecker
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.t("正在下载 TabCircle \(updates.pendingVersion)…",
-                        "Downloading TabCircle \(updates.pendingVersion)…"))
+            Text("Downloading TabCircle \(updates.pendingVersion)…")
                 .font(.system(size: 13, weight: .medium))
             ProgressView(value: updates.downloadProgress)
                 .frame(width: 280)
@@ -422,7 +394,7 @@ private struct DownloadProgressView: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
                 Spacer()
-                Button(L10n.t("取消", "Cancel")) {
+                Button("Cancel") {
                     updates.cancelDownload()
                 }
             }
@@ -432,21 +404,18 @@ private struct DownloadProgressView: View {
     }
 }
 
-// MARK: - 下载代理
+// MARK: - Download Delegate
 
-/// 下载结果。失败侧直接携带展示用的文案，不套 Error。
 private enum DownloadResult {
     case success(URL)
     case failure(String)
 }
 
-/// URLSession 的回调不在主线程，单独一个类接住，回主线程只传数据。
 private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
 
     private let expectedSize: Int64
     private let onProgress: (Double) -> Void
     private let onFinish: (DownloadResult) -> Void
-    /// 成功路径已经回调过，didCompleteWithError 的 nil error 不再重复回调。
     private var finished = false
 
     init(expectedSize: Int64,
@@ -462,7 +431,6 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent("TabCircle-update.dmg")
         try? FileManager.default.removeItem(at: dest)
 
-        // location 是系统临时文件，回调返回后立即被删，必须先挪走
         do {
             try FileManager.default.moveItem(at: location, to: dest)
         } catch {
@@ -471,7 +439,6 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
             return
         }
 
-        // 校验字节数：CDN 截断、连接中断的包不能进安装环节
         if expectedSize > 0,
            let attrs = try? FileManager.default.attributesOfItem(atPath: dest.path),
            let fileSize = attrs[.size] as? Int64,

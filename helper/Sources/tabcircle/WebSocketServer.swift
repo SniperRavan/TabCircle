@@ -2,18 +2,13 @@ import AppKit
 import Foundation
 import Network
 
-/// 只监听回环地址的极简 WebSocket 服务端。
+/// Minimalist loopback WebSocket server.
 ///
-/// 用 Network.framework 内置的 `NWProtocolWebSocket` —— 它自己处理 HTTP upgrade
-/// 握手和帧编解码，我们不用手写协议。所有收发都走 completion handler，
-/// 没有任何阻塞式 syscall，因此不会钉住线程。
+/// Uses Network.framework's built-in `NWProtocolWebSocket` for HTTP upgrade handshake
+/// and frame framing without blocking system calls.
 ///
-/// 多客户端：每个连接一个 UUID。任何 Chromium 浏览器装了扩展都会连上来，
-/// 浏览器之间是物理隔离的主体 —— 谁发的消息、命令发给谁，都必须带身份。
-/// 连接归属的浏览器通过「对端端口 → lsof 找 pid → 沿父进程链找到
-/// NSRunningApplication → bundle id」解析（扩展的网络请求走浏览器的
-/// 网络服务子进程，不能直接拿主进程）。解析失败不致命：单浏览器场景
-/// 由上层「唯一连接即生效」兜底。
+/// Multi-client support: each connection receives a UUID. Browser identity is resolved by
+/// tracing remote TCP port -> lsof pid -> parent process chain -> NSRunningApplication bundle ID.
 final class WebSocketServer {
 
     private let port: NWEndpoint.Port
@@ -21,13 +16,13 @@ final class WebSocketServer {
     private var listener: NWListener?
     private var connections: [UUID: NWConnection] = [:]
 
-    /// 收到文本帧。回调在主线程，带客户端 id。
+    /// Text frame received. Callback dispatched on main thread with client ID.
     var onText: ((Data, UUID) -> Void)?
-    /// 新客户端连上。回调在主线程。
+    /// New client connected. Callback dispatched on main thread.
     var onClientConnected: ((UUID) -> Void)?
-    /// 客户端断开。回调在主线程。
+    /// Client disconnected. Callback dispatched on main thread.
     var onClientDisconnected: ((UUID) -> Void)?
-    /// 客户端归属的浏览器解析完成（bundle id）。回调在主线程。
+    /// Owning browser resolved (bundle ID). Callback dispatched on main thread.
     var onClientIdentified: ((UUID, String) -> Void)?
 
     init(port: UInt16) {
@@ -37,16 +32,16 @@ final class WebSocketServer {
         self.port = p
     }
 
-    // MARK: - 生命周期
+    // MARK: - Lifecycle
 
     func start() throws {
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
-        // 只绑回环 —— 这个端口不对局域网暴露
+        // Bind exclusively to loopback interface
         params.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: port)
 
         let websocket = NWProtocolWebSocket.Options()
-        websocket.autoReplyPing = true          // 协议层 ping 自动回，应用层 ping 另算
+        websocket.autoReplyPing = true          // Protocol-level ping auto-response
         params.defaultProtocolStack.applicationProtocols.insert(websocket, at: 0)
 
         let listener = try NWListener(using: params)
@@ -64,7 +59,7 @@ final class WebSocketServer {
         self.listener = listener
     }
 
-    // MARK: - 连接
+    // MARK: - Connections
 
     private func accept(_ connection: NWConnection) {
         let id = UUID()
@@ -119,17 +114,15 @@ final class WebSocketServer {
                 DispatchQueue.main.async { self.onText?(data, id) }
             }
 
-            self.receive(on: connection, id: id)   // 继续收下一条
+            self.receive(on: connection, id: id)   // Continue receiving next message
         }
     }
 
-    // MARK: - 客户端归属浏览器解析
+    // MARK: - Browser Resolution
 
     private func resolveBrowser(of connection: NWConnection, id: UUID) {
         guard case let .hostPort(_, remotePort) = connection.endpoint else { return }
         let portValue = remotePort.rawValue
-        // lsof 是阻塞调用，放 GCD 全局队列（不是 Swift Concurrency 协作池），
-        // 十几毫秒的等待无伤大雅；连接建立是低频事件。
         DispatchQueue.global(qos: .utility).async {
             let pids = Self.pidsOnPort(portValue).filter { $0 != getpid() }
             DispatchQueue.main.async {
@@ -140,13 +133,12 @@ final class WebSocketServer {
                         return
                     }
                 }
-                log("🔎 client \(id.uuidString.prefix(8)) → 浏览器身份未识别（单浏览器场景不受影响）")
+                log("🔎 client \(id.uuidString.prefix(8)) → Browser identity unidentified (single-browser mode unaffected)")
             }
         }
     }
 
-    /// 占用了指定 TCP 端口（已建立状态）的进程。会同时列出我们自己
-    /// （服务端 socket 的对端就是这个端口），调用方负责排除。
+    /// List processes on given TCP port in ESTABLISHED state.
     private static func pidsOnPort(_ port: UInt16) -> [pid_t] {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
@@ -160,9 +152,7 @@ final class WebSocketServer {
         return text.split(whereSeparator: \.isNewline).compactMap { Int32($0) }
     }
 
-    /// 沿父进程链向上找到第一个「注册为应用」的进程的 bundle id。
-    /// 扩展的 socket 属于浏览器的网络服务子进程（Helper），本身不是
-    /// NSRunningApplication，必须向上回溯到 .app 主进程。
+    /// Walk up parent process hierarchy to locate the owning application bundle ID.
     private static func owningAppBundleID(of pid: pid_t) -> String? {
         var current = pid
         for _ in 0..<12 {
@@ -184,10 +174,9 @@ final class WebSocketServer {
         return info.kp_eproc.e_ppid
     }
 
-    // MARK: - 发送
+    // MARK: - Sending
 
-    /// 发给指定客户端。浏览器是隔离主体：switch/close/unpin/settings
-    /// 一律点对点，广播只留给 ping 这类无副作用消息。
+    /// Send to a specific client.
     func send(_ object: [String: Any], to id: UUID) {
         guard let data = try? JSONSerialization.data(withJSONObject: object) else { return }
         let metadata = NWProtocolWebSocket.Metadata(opcode: .text)

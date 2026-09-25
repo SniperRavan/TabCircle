@@ -3,7 +3,7 @@
 ## 1. Coding Conventions
 - **Python (Linux Helper):** Follow PEP 8. Use `asyncio` for WebSocket concurrency to avoid blocking the UI thread (PyQt6). 
 - **JavaScript (Extension):** Keep it Vanilla JS. No heavy frameworks (React, Vue, etc.).
-- **Relative Paths:** Never hardcode absolute system paths (e.g. `/home/user/...`). Always use relative paths (`../src`, `./components`, `os.path.dirname(__file__)`) relative to the project or file location.
+- **Relative Paths:** Never hardcode absolute system paths (e.g. system root or user home directories). Always use relative paths (`../src`, `./components`, `os.path.dirname(__file__)`) relative to the project or file location.
 
 ## 2. Constraints & Boundaries
 - **Extension Integrity:** The core logic of the `extension/` directory is highly optimized for performance and memory. Modify it *only* if explicitly necessary to support the Linux Helper. The extension must remain compatible with the original macOS helper if possible.

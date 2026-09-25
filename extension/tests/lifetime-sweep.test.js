@@ -1,10 +1,8 @@
-// 标签存活时间清理的回归测试。
+// Regression tests for tab lifetime sweep.
 //
-// 为什么值得单独测：自动关标签是**不可逆**的破坏性动作，而它唯一的安全网
-// 是一组过滤条件。条件里少一项、或者某个字段名写错，表现是「用户的标签
-// 悄悄没了」——没有报错、没有崩溃，等发现时数据早就没了。
+// Auto-closing tabs is irreversible; ensure filter predicates protect user tabs.
 //
-// 跑法：node extension/tests/lifetime-sweep.test.js
+// Run: node extension/tests/lifetime-sweep.test.js
 
 const fs = require("fs");
 const path = require("path");
@@ -12,8 +10,7 @@ const vm = require("vm");
 
 const SOURCE = path.join(__dirname, "..", "background.js");
 
-/// 把 background.js 装进一个带 chrome 桩的沙箱里跑起来。
-/// 返回沙箱本身 —— 顶层的 function 声明会挂到它上面，可以直接调。
+/// Load background.js in sandbox with chrome mocks.
 function loadExtension({ tabs, favorites, lifetimeHours, connected, favoritesKnown }) {
   const removed = [];
   const logs = [];
@@ -66,8 +63,7 @@ function loadExtension({ tabs, favorites, lifetimeHours, connected, favoritesKno
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(SOURCE, "utf8"), sandbox, { filename: "background.js" });
 
-  // 把被测状态摆到位。这些都是 background.js 的顶层 let/const，
-  // 沙箱里能直接改（vm 的顶层 let 不挂 global，所以用一段脚本改）。
+  // Set state under test for background.js top-level bindings.
   vm.runInContext(
     `settings.tabLifetimeHours = ${lifetimeHours};
      settings.favorites = ${JSON.stringify(favorites)};
@@ -103,9 +99,9 @@ async function run(title, setup, assert) {
 }
 
 (async () => {
-  // 基线：确实会清理超期的普通标签，否则下面的「没被清理」都是假通过
+  // Baseline: confirm expired normal tabs are cleaned
   await run(
-    "超期的普通标签会被关闭（基线）",
+    "Expired normal tabs are closed (baseline)",
     {
       tabs: [
         { id: 1, url: "https://a.com/", lastAccessed: idle(30), active: false, pinned: false },
@@ -117,13 +113,13 @@ async function run(title, setup, assert) {
       favoritesKnown: true,
     },
     (removed) => {
-      check("关掉闲置 30h 的", removed.includes(1));
-      check("留下闲置 1h 的", !removed.includes(2), `removed=${removed}`);
+      check("Closes tab idle for 30h", removed.includes(1));
+      check("Keeps tab idle for 1h", !removed.includes(2), `removed=${removed}`);
     }
   );
 
   await run(
-    "置顶标签永不被清理（主防线）",
+    "Pinned tabs never swept (primary defense)",
     {
       tabs: [
         { id: 1, url: "https://mail.google.com/", lastAccessed: idle(500), active: false, pinned: true },
@@ -135,15 +131,15 @@ async function run(title, setup, assert) {
       favoritesKnown: true,
     },
     (removed) => {
-      check("置顶的收藏标签还在", !removed.includes(1), `removed=${removed}`);
-      check("同样超期的普通标签被清掉", removed.includes(2));
+      check("Pinned favorite tab preserved", !removed.includes(1), `removed=${removed}`);
+      check("Expired normal tab cleaned", removed.includes(2));
     }
   );
 
   await run(
-    "收藏还没被置顶时，按域名兜住（第二道防线）",
+    "Unpinned favorite guarded by domain (secondary defense)",
     {
-      // ensureFavorites 还没来得及补置顶 / 分支浏览器没照做 pinned
+      // Unpinned favorite guarded by domain
       tabs: [
         { id: 1, url: "https://notion.so/page", lastAccessed: idle(300), active: false, pinned: false },
         { id: 2, url: "https://x.com/", lastAccessed: idle(300), active: false, pinned: false },
@@ -154,13 +150,13 @@ async function run(title, setup, assert) {
       favoritesKnown: true,
     },
     (removed) => {
-      check("未置顶的收藏标签没被关掉", !removed.includes(1), `removed=${removed}`);
-      check("无关的超期标签照常清理", removed.includes(2));
+      check("Unpinned favorite tab preserved", !removed.includes(1), `removed=${removed}`);
+      check("Unrelated expired tab swept as usual", removed.includes(2));
     }
   );
 
   await run(
-    "收藏已正常置顶时，同域名的其他标签不获豁免（别搞无差别保护）",
+    "When favorite is pinned, other tabs on domain are not exempted",
     {
       tabs: [
         { id: 1, url: "https://github.com/me", lastAccessed: idle(300), active: false, pinned: true },
@@ -172,13 +168,13 @@ async function run(title, setup, assert) {
       favoritesKnown: true,
     },
     (removed) => {
-      check("置顶本尊留着", !removed.includes(1));
-      check("同域名的闲置标签该清就清", removed.includes(2), `removed=${removed}`);
+      check("Pinned tab kept", !removed.includes(1));
+      check("Idle tab under same domain swept", removed.includes(2), `removed=${removed}`);
     }
   );
 
   await run(
-    "收藏清单还没到（身份识别中）时一律不动手",
+    "Never sweep before favorites list arrives",
     {
       tabs: [{ id: 1, url: "https://a.com/", lastAccessed: idle(300), active: false, pinned: false }],
       favorites: [],
@@ -186,11 +182,11 @@ async function run(title, setup, assert) {
       connected: true,
       favoritesKnown: false,
     },
-    (removed) => check("一个都没关", removed.length === 0, `removed=${removed}`)
+    (removed) => check("None closed", removed.length === 0, `removed=${removed}`)
   );
 
   await run(
-    "helper 没连上时不清理",
+    "Do not sweep when helper is disconnected",
     {
       tabs: [{ id: 1, url: "https://a.com/", lastAccessed: idle(300), active: false, pinned: false }],
       favorites: [],
@@ -198,11 +194,11 @@ async function run(title, setup, assert) {
       connected: false,
       favoritesKnown: true,
     },
-    (removed) => check("一个都没关", removed.length === 0, `removed=${removed}`)
+    (removed) => check("None closed", removed.length === 0, `removed=${removed}`)
   );
 
   await run(
-    "存活时间为「永久」时不清理",
+    "Do not sweep when lifetime is 0 (disabled)",
     {
       tabs: [{ id: 1, url: "https://a.com/", lastAccessed: idle(9000), active: false, pinned: false }],
       favorites: [],
@@ -210,11 +206,11 @@ async function run(title, setup, assert) {
       connected: true,
       favoritesKnown: true,
     },
-    (removed) => check("一个都没关", removed.length === 0, `removed=${removed}`)
+    (removed) => check("None closed", removed.length === 0, `removed=${removed}`)
   );
 
   await run(
-    "当前标签、出声的标签、分组内的标签都不动",
+    "Active, audible, and grouped tabs are never closed",
     {
       tabs: [
         { id: 1, url: "https://a.com/", lastAccessed: idle(300), active: true, pinned: false },
@@ -228,15 +224,15 @@ async function run(title, setup, assert) {
       favoritesKnown: true,
     },
     (removed) => {
-      check("active 保住", !removed.includes(1));
-      check("audible 保住", !removed.includes(2));
-      check("分组内保住", !removed.includes(3));
-      check("其余照常清理", removed.includes(4), `removed=${removed}`);
+      check("Active tab preserved", !removed.includes(1));
+      check("Audible tab preserved", !removed.includes(2));
+      check("Grouped tab preserved", !removed.includes(3));
+      check("Remaining tabs cleaned", removed.includes(4), `removed=${removed}`);
     }
   );
 
   await run(
-    "拿不到 lastAccessed 的标签一律不动（旧 Chrome / 新开未激活）",
+    "Tabs without lastAccessed are untouched",
     {
       tabs: [
         { id: 1, url: "https://a.com/", active: false, pinned: false },
@@ -247,9 +243,9 @@ async function run(title, setup, assert) {
       connected: true,
       favoritesKnown: true,
     },
-    (removed) => check("一个都没关", removed.length === 0, `removed=${removed}`)
+    (removed) => check("None closed", removed.length === 0, `removed=${removed}`)
   );
 
-  console.log(failures === 0 ? "\n全部通过" : `\n${failures} 项失败`);
+  console.log(failures === 0 ? "\nAll tests passed" : `\n${failures} failed`);
   process.exit(failures === 0 ? 0 : 1);
 })();

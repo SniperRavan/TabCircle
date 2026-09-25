@@ -1,13 +1,13 @@
-// 已关闭标签存档的回归测试。
+// Regression tests for closed tab archiving.
 //
-// 为什么值得单独测：这条链路上每一个错误都是**静默**的。
-//   · 无痕标签漏进存档 —— 不报错，一份无痕浏览记录就这么落到了磁盘上
-//   · 关闭原因判错     —— 不报错，用户只是看到「自动」和「手动」贴反了
-//   · 元信息取不到     —— 不报错，列表里悄悄少几条
-// 而它依赖的两个前提都很脆：onRemoved 拿不到任何元信息（只能靠影子副本），
-// 以及「自己动手前先打标记」必须严格发生在 tabs.remove 之前。
+// Validates that metadata and close reasons are accurately recorded without silent failures.
+//   - Incognito tabs must never be recorded to disk
+//   - Accurate distinction between manual, automatic (lifetime), and switcher closes
+//   - Shadow metadata retrieval ensures info is present after onRemoved
+// onRemoved does not provide tab metadata,
+// and closing reasons must be registered before tabs.remove.
 //
-// 跑法：node extension/tests/closed-tabs.test.js
+// Run: node extension/tests/closed-tabs.test.js
 
 const fs = require("fs");
 const path = require("path");
@@ -15,12 +15,12 @@ const vm = require("vm");
 
 const SOURCE = path.join(__dirname, "..", "background.js");
 
-/// 把 background.js 装进带 chrome 桩的沙箱里。
+/// Load background.js into sandbox with chrome mock.
 ///
-/// 和 lifetime-sweep 那份的关键区别：这里必须捕获 onRemoved 的 listener，
-/// 并且让 tabs.remove 的桩真的去触发它 —— 「标记是否早于 remove」正是
-/// 本文件要验证的东西，桩里省掉这一步的话 lifetime / switcher 两个用例
-/// 会双双假通过。
+/// Captures onRemoved listener and triggers it on tabs.remove.
+/// Validates that marks precede tabs.remove.
+///
+///
 function loadExtension({ tabs, sessionStorage = {}, lifetimeHours = 0 }) {
   const sent = [];
   const logs = [];
@@ -68,8 +68,7 @@ function loadExtension({ tabs, sessionStorage = {}, lifetimeHours = 0 }) {
           for (const id of list) {
             const tab = liveTabs.find((t) => t.id === id);
             if (tab) tab.__gone = true;
-            // Chrome 真实行为：remove 之后 onRemoved 才触发，而那时标签
-            // 已经查不到了。这正是影子副本存在的理由。
+            // Chrome behavior: onRemoved fires after remove; shadow copy preserves metadata.
             if (onRemovedListener) await onRemovedListener(id, { isWindowClosing: false });
           }
         },
@@ -119,7 +118,7 @@ function loadExtension({ tabs, sessionStorage = {}, lifetimeHours = 0 }) {
     logs,
     removed,
     created,
-    /// 收集到的关闭存档（跨所有批次拍平）
+    /// Collected closed tab archives across all batches
     archived: () => sent.filter((m) => m.type === "tabsClosed").flatMap((m) => m.tabs),
     batches: () => sent.filter((m) => m.type === "tabsClosed"),
     fireRemoved: (id, removeInfo) => {
@@ -135,8 +134,7 @@ const HOUR = 3600 * 1000;
 const now = Date.now();
 const idle = (h) => now - h * HOUR;
 
-/// 等 flushClosed 的 120ms debounce 到点。顺带把「合并」这个行为也测进去 ——
-/// 直接调 flushClosed() 会跳过 debounce，那样批次数就永远是对的。
+/// Wait for flushClosed 120ms debounce.
 const settle = () => new Promise((r) => setTimeout(r, 200));
 
 let failures = 0;
@@ -162,25 +160,25 @@ const tab = (id, url, extra = {}) => ({
 });
 
 (async () => {
-  // ── 基线 ────────────────────────────────────────────────────────────
+  // ── Baseline ────────────────────────────────────────────────────────
   {
-    console.log("手动关闭的标签会连元信息一起存档（基线）");
+    console.log("Manually closed tab archives with metadata (baseline)");
     const ctx = loadExtension({ tabs: [tab(1, "https://a.com/"), tab(2, "https://b.com/")] });
-    await ctx.run("pushMRU()");          // 建立影子副本
+    await ctx.run("pushMRU()");          // Establish shadow metadata
     await ctx.fireRemoved(1);
     await settle();
 
     const archived = ctx.archived();
-    check("记了一条", archived.length === 1, `archived=${JSON.stringify(archived)}`);
-    check("URL 对得上", archived[0]?.url === "https://a.com/");
-    check("标题从影子副本里取到了", archived[0]?.title === "T1", `title=${archived[0]?.title}`);
-    check("favicon 也带上了", archived[0]?.favIconUrl === "https://a.com/favicon.ico");
-    check("原因是手动", archived[0]?.reason === "manual", `reason=${archived[0]?.reason}`);
+    check("Recorded 1 closed tab", archived.length === 1, `archived=${JSON.stringify(archived)}`);
+    check("URL matches", archived[0]?.url === "https://a.com/");
+    check("Title retrieved from shadow metadata", archived[0]?.title === "T1", `title=${archived[0]?.title}`);
+    check("Favicon included", archived[0]?.favIconUrl === "https://a.com/favicon.ico");
+    check("Reason is manual", archived[0]?.reason === "manual", `reason=${archived[0]?.reason}`);
   }
 
-  // ── 隐私红线 ────────────────────────────────────────────────────────
+  // ── Privacy Boundary ────────────────────────────────────────────────
   {
-    console.log("无痕标签绝不进存档");
+    console.log("Incognito tabs never archived");
     const ctx = loadExtension({
       tabs: [
         tab(1, "https://secret.example/", { incognito: true }),
@@ -193,21 +191,18 @@ const tab = (id, url, extra = {}) => ({
     await settle();
 
     const archived = ctx.archived();
-    // 不只查解析出来的 archived，连整批消息的原文都扫一遍 —— 免得哪天
-    // 存档 payload 多带一个字段又把它捎出去。
+    // Verify raw payload to ensure no incognito info leaked
     //
-    // 范围只到存档消息：pushMRU 推给 helper 的**实时**列表里确实会有无痕
-    // 标签（用户在 chrome://extensions 开了「在无痕模式下启用」的话），
-    // 那是本功能之前就有的行为。这份测试守的是「不落盘」这条线。
+    // Verify incognito tab is never saved to disk
     const wire = JSON.stringify(ctx.batches());
-    check("无痕的那条没被存档", !archived.some((t) => t.url.includes("secret.example")),
+    check("Incognito tab excluded from archive", !archived.some((t) => t.url.includes("secret.example")),
           `archived=${JSON.stringify(archived)}`);
-    check("存档消息原文里也没有它", !wire.includes("secret.example"));
-    check("同批的普通标签照常存档", archived.some((t) => t.url.includes("ordinary.example")));
+    check("Raw archive message does not contain incognito tab", !wire.includes("secret.example"));
+    check("Normal tabs in same batch archived properly", archived.some((t) => t.url.includes("ordinary.example")));
   }
 
   {
-    console.log("chrome:// 和扩展页不进存档（找回它们没有意义）");
+    console.log("chrome:// and extension pages not archived");
     const ctx = loadExtension({
       tabs: [tab(1, "chrome://extensions/"), tab(2, "https://ok.example/")],
     });
@@ -217,14 +212,14 @@ const tab = (id, url, extra = {}) => ({
     await settle();
 
     const archived = ctx.archived();
-    check("chrome:// 被滤掉", !archived.some((t) => t.url.startsWith("chrome://")),
+    check("chrome:// tab filtered out", !archived.some((t) => t.url.startsWith("chrome://")),
           `archived=${JSON.stringify(archived)}`);
-    check("普通页面还在", archived.length === 1);
+    check("Normal page preserved", archived.length === 1);
   }
 
-  // ── 原因判定 ────────────────────────────────────────────────────────
+  // ── Reason Classification ───────────────────────────────────────────
   {
-    console.log("自动清理关掉的标记为 lifetime");
+    console.log("Automatically cleaned tab marked as lifetime");
     const ctx = loadExtension({
       tabs: [tab(1, "https://old.example/", { lastAccessed: idle(300) })],
       lifetimeHours: 12,
@@ -234,45 +229,44 @@ const tab = (id, url, extra = {}) => ({
     await settle();
 
     const archived = ctx.archived();
-    check("确实关了", ctx.removed.includes(1));
-    check("原因是 lifetime", archived[0]?.reason === "lifetime",
+    check("Tab removed", ctx.removed.includes(1));
+    check("Reason is lifetime", archived[0]?.reason === "lifetime",
           `reason=${archived[0]?.reason}`);
   }
 
   {
-    console.log("切换器 ✕ 关掉的标记为 switcher");
+    console.log("Switcher close button marked as switcher");
     const ctx = loadExtension({ tabs: [tab(1, "https://x.example/"), tab(2, "https://y.example/")] });
     await ctx.run("pushMRU()");
     await ctx.run(`handleHelperMessage(JSON.stringify({ type: "close", tabId: 1 }))`);
     await settle();
 
     const archived = ctx.archived();
-    check("原因是 switcher", archived[0]?.reason === "switcher",
+    check("Reason is switcher", archived[0]?.reason === "switcher",
           `reason=${archived[0]?.reason}`);
   }
 
   {
-    console.log("关窗口连带的标记为 window");
+    console.log("Closing window marks tabs as window");
     const ctx = loadExtension({ tabs: [tab(1, "https://w.example/")] });
     await ctx.run("pushMRU()");
     await ctx.fireRemoved(1, { isWindowClosing: true });
     await settle();
 
-    check("原因是 window", ctx.archived()[0]?.reason === "window",
+    check("Reason is window", ctx.archived()[0]?.reason === "window",
           `reason=${ctx.archived()[0]?.reason}`);
   }
 
-  // ── 影子副本 ────────────────────────────────────────────────────────
+  // ── Shadow Copy ─────────────────────────────────────────────────────
   {
-    console.log("service worker 刚被 onRemoved 唤醒时，元信息从 storage.session 取");
-    // 关键场景：SW 被回收后，内存里的 tabMeta 是空的，pushMRU 一次都没跑过。
-    // 唯一的信息来源是上一轮存进 storage.session 的那份快照。
+    console.log("When SW woken by onRemoved, metadata retrieved from storage.session");
+    // Key scenario: SW was recycled and tabMeta in memory is empty.
     const ctx = loadExtension({
       tabs: [],
       sessionStorage: {
         mru: [7],
         tabMeta: {
-          7: { url: "https://revived.example/", title: "从存储里恢复的",
+          7: { url: "https://revived.example/", title: "Restored from storage",
                favIconUrl: "https://revived.example/f.ico", incognito: false },
         },
       },
@@ -281,24 +275,24 @@ const tab = (id, url, extra = {}) => ({
     await settle();
 
     const archived = ctx.archived();
-    check("照样存档了", archived.length === 1, `archived=${JSON.stringify(archived)}`);
-    check("标题来自 storage 里的快照", archived[0]?.title === "从存储里恢复的");
+    check("Archived successfully", archived.length === 1, `archived=${JSON.stringify(archived)}`);
+    check("Title comes from storage snapshot", archived[0]?.title === "Restored from storage");
   }
 
   {
-    console.log("影子副本里查无此人时不塞空记录");
+    console.log("Missing shadow metadata does not create empty records");
     const ctx = loadExtension({ tabs: [tab(1, "https://a.example/")] });
     await ctx.run("pushMRU()");
-    await ctx.fireRemoved(4242);         // 从没被任何一轮 pushMRU 见过
+    await ctx.fireRemoved(4242);         // Never seen by any pushMRU
     await settle();
 
-    check("一条都没发", ctx.batches().length === 0,
+    check("No message sent", ctx.batches().length === 0,
           `sent=${JSON.stringify(ctx.batches())}`);
   }
 
-  // ── 批量合并 ────────────────────────────────────────────────────────
+  // ── Batch Merging ───────────────────────────────────────────────────
   {
-    console.log("一次关掉多个只发一条消息（自动清理能一口气关几百个）");
+    console.log("Multiple closed tabs merged into single batch message");
     const ctx = loadExtension({
       tabs: [1, 2, 3, 4, 5].map((i) => tab(i, `https://s${i}.example/`, { lastAccessed: idle(300) })),
       lifetimeHours: 12,
@@ -307,34 +301,34 @@ const tab = (id, url, extra = {}) => ({
     await ctx.run("sweepExpiredTabs()");
     await settle();
 
-    check("合并成 1 批", ctx.batches().length === 1, `batches=${ctx.batches().length}`);
-    check("5 条都在里面", ctx.archived().length === 5, `count=${ctx.archived().length}`);
+    check("Merged into 1 batch", ctx.batches().length === 1, `batches=${ctx.batches().length}`);
+    check("All 5 tabs included", ctx.archived().length === 5, `count=${ctx.archived().length}`);
   }
 
-  // ── 找回 ────────────────────────────────────────────────────────────
+  // ── Reopen ──────────────────────────────────────────────────────────
   {
-    console.log("helper 的 reopen 命令会新开标签");
+    console.log("Helper reopen command opens new tab");
     const ctx = loadExtension({ tabs: [tab(1, "https://a.example/")] });
     await ctx.run(
       `handleHelperMessage(JSON.stringify({ type: "reopen", url: "https://back.example/page" }))`
     );
     await settle();
 
-    check("开了一个", ctx.created.length === 1, `created=${JSON.stringify(ctx.created)}`);
-    check("地址对得上", ctx.created[0]?.url === "https://back.example/page");
+    check("Opened tab", ctx.created.length === 1, `created=${JSON.stringify(ctx.created)}`);
+    check("URL matches", ctx.created[0]?.url === "https://back.example/page");
   }
 
   {
-    console.log("reopen 只认 http(s)（别让 helper 侧的坏数据变成任意 URL 打开）");
+    console.log("reopen validates http(s) protocol");
     const ctx = loadExtension({ tabs: [tab(1, "https://a.example/")] });
     await ctx.run(
       `handleHelperMessage(JSON.stringify({ type: "reopen", url: "javascript:alert(1)" }))`
     );
     await settle();
 
-    check("没有开", ctx.created.length === 0, `created=${JSON.stringify(ctx.created)}`);
+    check("Did not open non-http tab", ctx.created.length === 0, `created=${JSON.stringify(ctx.created)}`);
   }
 
-  console.log(failures === 0 ? "\n全部通过" : `\n${failures} 项失败`);
+  console.log(failures === 0 ? "\nAll tests passed" : `\n${failures} failed`);
   process.exit(failures === 0 ? 0 : 1);
 })();

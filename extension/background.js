@@ -1,68 +1,71 @@
 // TabCircle Bridge — MV3 service worker
 //
-// 职责：
-//   1. 维护全局标签页 MRU 顺序（最近使用的在前）
-//   2. 通过本地 WebSocket 把 MRU 列表推给 Swift helper
-//   3. 执行 helper 下发的切换指令
+// Responsibilities:
+//   1. Maintain global tab MRU order (most recently used first)
+//   2. Push MRU list to helper via local WebSocket
+//   3. Execute tab switch commands from helper
 //
-// 连接本身不在这里：MV3 的 service worker 空闲 30s 就被回收，被回收后无法
-// 主动重连，只能等浏览器事件唤醒 —— 那正是「开完 app 第一次按 ⌃⇥ 不生效」
-// 的原因。WebSocket 交给 offscreen document 常驻持有（offscreen.js），
-// 这边只通过 runtime 消息收发；消息到达时 SW 会被自动唤醒。
+// Connection is held by offscreen document: MV3 service worker is recycled
+// after 30s of inactivity, preventing auto-reconnect without browser events.
+// offscreen.js holds the persistent WebSocket and wakes SW on message arrival.
+// SW communicates with offscreen via chrome.runtime messaging.
 
 const OFFSCREEN_PATH = "offscreen.html";
 const RECONNECT_ALARM = "tabcircle-reconnect";
 const STORAGE_KEY = "mru";
 const META_KEY = "tabMeta";
 
-/// 配置的事实源在 macOS app 那边（它有原生设置窗口，且进程一直活着）。
-/// 这里的值只是内存里的一份副本：每次连上 helper 都会重新要一份，
-/// 所以 service worker 被回收也不会导致两边不一致。
+/// Settings source of truth lives in the helper application.
+/// Local values are an in-memory cache requested upon connection.
+/// Safe against SW recycles.
 const DEFAULT_SETTINGS = {
   scopeToWindow: true,
-  // 标签存活小时数，0 = 不清理。超时未使用的标签由 sweepExpiredTabs 关闭。
-  // 默认 0：service worker 重启后 helper 不在线时就是这份默认值，
-  // 清理这种破坏性动作的失败方向必须是「不动手」。
+  // Tab lifetime in hours, 0 = do not close. Idle tabs closed by sweepExpiredTabs.
+  // Default is 0: safe fallback if helper is offline.
+  // Destruction action fallback must always do nothing.
   tabLifetimeHours: 0,
-  // 收藏的标签 [{url, title}]，连上时核对补齐（ensureFavorites）。
+  // Favorited tabs [{url, title}], reconciled upon connection.
   favorites: [],
+  // Capture viewport screenshots for switcher cards. Set false in low-resource mode.
+  captureThumbnails: true,
 };
 
-// 诊断探针 + 降噪（与 offscreen.js 同款）：未捕获的 promise 拒绝把完整
-// 堆栈写进 helper 日志，并阻止分支浏览器（夸克）把它渲染成错误卡片。
+// Unhandled promise rejections forwarded to helper logs.
+// Diagnostic logging for unhandled errors.
 self.addEventListener("unhandledrejection", (event) => {
   event.preventDefault();
   const reason = event.reason;
   const detail = (reason && (reason.stack || reason.message)) || String(reason);
-  // 浏览器退出时挂起的 API 调用会成批拒绝，属正常噪音，不进日志
+  // Suppress shutdown noise from pending API calls.
   if (detail.includes("browser is shutting down")) return;
   send({ type: "log", message: `sw unhandled rejection: ${detail}` });
 });
 
-let connected = false;   // offscreen 报上来的连接状态
-let mru = [];          // tabId 数组，最近使用的在前，跨窗口全局维护
+let connected = false;   // Connection state reported by offscreen
+let browserIsDark = true; // Browser theme state reported by offscreen
+let mru = [];          // Array of tabId in MRU order, global across all windows
 let mruLoaded = false;
 let settings = { ...DEFAULT_SETTINGS };
 
-/// 活标签的元信息影子副本：tabId → {url, title, favIconUrl, incognito}。
+/// Shadow copy of tab metadata: tabId -> {url, title, favIconUrl, incognito}.
 ///
-/// 为什么非要有这么一份：`chrome.tabs.onRemoved` 只给 `(tabId, removeInfo)`，
-/// **元信息一个字都没有**，而那一刻标签已经从 tab strip 摘掉，
-/// `chrome.tabs.get(tabId)` 直接抛错。要记录「关掉的是什么」，只能提前备份。
+/// Needed because chrome.tabs.onRemoved does not provide tab metadata,
+/// and tabs.get(tabId) throws after the tab has been destroyed.
+/// Pre-caching metadata allows recording closed tabs accurately.
 ///
-/// 自动清理不需要它（`sweepExpiredTabs` 是我们主动 remove，victims 在手上），
-/// 但用户 ⌘W 关掉的没有这个便利 —— 这份副本是唯一的信息来源。
+/// Sweep already knows victims, but manual closures rely entirely on this copy.
+/// Manual close events rely on this shadow copy as sole info source.
 let tabMeta = {};
 
-// ── MRU 维护 ────────────────────────────────────────────────────────────
+// ── MRU Maintenance ────────────────────────────────────────────────────
 
-// service worker 随时可能被回收，MRU 必须能从 storage.session 恢复。
-// storage.session 存在内存里，浏览器关闭即清空，正好符合「本次浏览会话」语义。
+// MRU is persisted to and restored from storage.session across SW restarts.
+// storage.session is cleared on browser exit, matching browser session lifecycle.
 async function loadMRU() {
   if (mruLoaded) return;
   const stored = await chrome.storage.session.get([STORAGE_KEY, META_KEY]);
   mru = stored[STORAGE_KEY] ?? [];
-  // 影子副本一起恢复 —— SW 被回收后用户关掉的标签，元信息只能来自这里
+  // Restore metadata shadow copy from session storage
   tabMeta = stored[META_KEY] ?? {};
   mruLoaded = true;
 }
@@ -74,7 +77,7 @@ async function persistMRU() {
 async function touchTab(tabId) {
   await loadMRU();
   const i = mru.indexOf(tabId);
-  if (i === 0) return;               // 已经在最前，无需变动
+  if (i === 0) return;               // Already at front, no change needed
   if (i > 0) mru.splice(i, 1);
   mru.unshift(tabId);
   await persistMRU();
@@ -90,24 +93,24 @@ async function forgetTab(tabId) {
   await pushMRU();
 }
 
-/// 把 MRU 顺序连同展示所需的元信息推给 helper。
+/// Push MRU order and display metadata to helper.
 async function pushMRU() {
   if (!connected) return;
   await loadMRU();
 
   const allTabs = await chrome.tabs.query({});
 
-  // 清理已关闭的标签页（SW 休眠期间关掉的不会走 onRemoved）。
-  // 注意这一步必须对**全部窗口**做：按窗口过滤是展示层的事，
-  // 拿过滤后的结果回写 mru 会把其他窗口的历史整段抹掉。
+  // Clean up closed tabs (closed while SW was sleeping).
+  // This must be evaluated across all windows; filtering is handled by helper.
+  // Filtering beforehand would inadvertently wipe history of other windows.
   const aliveIds = new Set(allTabs.map((t) => t.id));
   const cleaned = mru.filter((id) => aliveIds.has(id));
   const mruDirty = cleaned.length !== mru.length;
   if (mruDirty) mru = cleaned;
 
-  // 顺手刷新元信息影子副本 —— 这里是全场唯一一处能同时看到所有标签
-  // 全部字段的地方。逐字段比对出脏标记而不是无脑写：storage.session
-  // 虽在内存里，几百个标签一份也有上百 KB，而 pushMRU 是高频路径。
+  // Refresh shadow metadata copy across all tabs.
+  // Avoid redundant writes to storage.session by checking dirty state.
+  // pushMRU is a high-frequency path so optimize memory transfers.
   let metaDirty = Object.keys(tabMeta).length !== allTabs.length;
   const nextMeta = {};
   for (const t of allTabs) {
@@ -115,9 +118,9 @@ async function pushMRU() {
       url: t.url ?? "",
       title: t.title ?? "",
       favIconUrl: t.favIconUrl ?? "",
-      // 无痕标签绝不外传：关闭记录会**落盘**到 app 目录，性质比「关掉一个
-      // 标签」严重得多。扩展默认根本拿不到无痕标签，但用户可以在
-      // chrome://extensions 打开「在无痕模式下启用」—— 那时这就是唯一防线。
+      // Never persist or expose incognito tab metadata.
+      // Incognito tabs must remain strictly private.
+      // Defense line if user enabled incognito access in extension settings.
       incognito: t.incognito === true,
     };
     nextMeta[t.id] = entry;
@@ -133,15 +136,15 @@ async function pushMRU() {
 
   if (allTabs.length === 0) return;
 
-  // 始终推全量（所有窗口）：helper 的状态栏菜单要列出全部标签。
-  // 「只切换当前窗口」的过滤在 helper 侧做（只作用于切换器），
-  // 这里附上 currentWindowId 供它过滤。settings.scopeToWindow 不再
-  // 影响推送内容。
+  // Push all windows; helper handles window-scope filtering.
+  // Window filtering is performed in helper UI.
+  // Include currentWindowId for helper filtering.
+  // Push full list regardless of scopeToWindow.
   const windowId = await currentWindowId();
 
   const byId = new Map(allTabs.map((t) => [t.id, t]));
 
-  // 已知顺序优先；从没被激活过的标签页（后台打开的、恢复会话带回来的）排在末尾
+  // Known MRU tabs first; background/restored tabs appended at end.
   const known = mru.filter((id) => byId.has(id));
   const knownSet = new Set(known);
   const unknown = allTabs.filter((t) => !knownSet.has(t.id)).map((t) => t.id);
@@ -149,6 +152,7 @@ async function pushMRU() {
   send({
     type: "mru",
     currentWindowId: windowId ?? -1,
+    isDark: browserIsDark,
     tabs: [...known, ...unknown].map((id) => {
       const t = byId.get(id);
       return {
@@ -157,21 +161,21 @@ async function pushMRU() {
         title: t.title ?? "",
         url: t.url ?? "",
         favIconUrl: t.favIconUrl ?? "",
-        // 最近一次被使用的时刻（ms epoch，Chrome 121+）。状态栏菜单的
-        // 「X 分钟前」和存活时间判定都以它为准。
+        // Last accessed timestamp in ms (Chrome 121+).
+        // Used for idle duration calculation.
         lastAccessed: typeof t.lastAccessed === "number" ? t.lastAccessed : 0,
-        // 置顶态，切换器卡片的星标用
+        // Pinned state for card badge
         pinned: t.pinned ?? false,
       };
     }),
   });
 }
 
-/// 节流版 pushMRU，给高频事件用。
+/// Throttled pushMRU for high frequency events.
 ///
-/// onUpdated 会为一个页面加载过程中 title / favicon 的每次变化各触发一遍，
-/// SPA 站点实测能在同一秒内打十几次。关键路径（激活、关闭、跨窗口移动）
-/// 仍然直接调 pushMRU，不走这里。
+/// onUpdated fires repeatedly during page load for title and favicon.
+/// SPAs can trigger dozens of updates per second.
+/// Critical paths (activation, close, move) call pushMRU directly.
 let pushTimer = null;
 function schedulePush() {
   clearTimeout(pushTimer);
@@ -181,76 +185,95 @@ function schedulePush() {
   }, 80);
 }
 
-/// 最后聚焦的普通窗口的 id。
+/// Returns ID of the last focused normal window.
 ///
-/// 不用 `windows.getLastFocused` —— 它的 `windowTypes` 过滤已废弃，
-/// 焦点落在开发者工具窗口时会返回那个窗口。从活动标签页反查更稳。
+/// Avoid windows.getLastFocused due to deprecated windowTypes filter.
+/// Reverse-lookup from active tab is more reliable.
 async function currentWindowId() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   return tab?.windowId;
 }
 
-// ── 缩略图 ──────────────────────────────────────────────────────────────
+// ── Thumbnails ─────────────────────────────────────────────────────────
 //
-// captureVisibleTab 只能截「当前可见」的标签页，所以策略是：每次标签页被激活
-// 就给它截一张。MRU 列表里的标签页按定义都被激活过，缩略图因此天然齐全。
+// Capture screenshot when a tab is activated; debounced to respect rate limits.
+// Tabs in MRU have all been activated, ensuring thumbnails are populated.
 //
-// 两个约束：
-//   · captureVisibleTab 有每秒调用次数上限，快速连切会报错 → 用 debounce 压住
-//   · chrome:// 和 Web Store 页面截不了 → 静默失败，helper 那边降级显示 favicon
+// Constraints:
+//   - Rate limits on captureVisibleTab: handled with debounce
+//   - chrome:// and Web Store pages cannot be captured: fallback to favicon
 
-const THUMB_DEBOUNCE_MS = 250;   // 等页面画完，也顺便合并连续切换
-/// 缩略图长边上限。**不裁剪**，只等比缩小（见 downscale）。
+const THUMB_DEBOUNCE_MS = 250;   // Debounce delay to let page finish rendering
+/// Max thumbnail long edge. Kept uncropped so helper can align as background.
 ///
-/// 900 不是随手取的：helper 拿这张图当切换器浮层的折射背景（浮层要把背后那块
-/// 网页画进自己的视图树，`.glassEffect()` 才折射得到），400 放大到浮层尺寸会糊。
+/// Full viewport resolution allows helper to use image for refraction backdrop.
+/// Higher resolution avoids blur when scaled up in overlay.
 const THUMB_MAX_WIDTH = 900;
 
 let thumbTimer = null;
 
 function scheduleThumbnail(tabId, windowId) {
+  if (settings.captureThumbnails === false) return;
   clearTimeout(thumbTimer);
   thumbTimer = setTimeout(() => captureThumbnail(tabId, windowId), THUMB_DEBOUNCE_MS);
 }
 
 async function captureThumbnail(tabId, windowId) {
-  if (!connected) return;
+  if (!connected || settings.captureThumbnails === false) return;
   try {
+    // 1. Confirm active tab exists and is the targeted tab
+    const [current] = await chrome.tabs.query({ active: true, windowId });
+    if (!current || current.id !== tabId || !current.url) return;
+
+    // 2. Browser internal and privileged pages (chrome://, brave://, devtools://, about:, etc.)
+    // cannot be captured by extensions due to browser security policies.
+    const url = current.url.toLowerCase();
+    if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("file://")) {
+      return;
+    }
+
     const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
       format: "jpeg",
       quality: 70,
     });
-    // 确认这期间用户没又切走 —— 否则会把 B 的截图挂到 A 名下
-    const [current] = await chrome.tabs.query({ active: true, windowId });
-    if (current?.id !== tabId) return;
+    // Confirm active tab has not changed during async capture
+    const [after] = await chrome.tabs.query({ active: true, windowId });
+    if (after?.id !== tabId) return;
 
-    // 带上 url：helper 按 URL 持久化缓存，tabId 浏览器一重启就全变了
-    // full:true = 这张图是**完整视口、未裁剪**的。helper 只拿带这个标记的图当
-    // 折射背景 —— 磁盘上还缓存着老版本按 400×250 居中裁过的图，比例和覆盖范围
-    // 都不对，拿去对齐会得到一块错位的假背景，比没有折射难看得多。
-    // 旧扩展不发这个字段，helper 读到 nil 就只当普通缩略图用，向后兼容。
+    // Include URL: helper caches by URL across restarts
+    // full:true indicates complete uncropped viewport screenshot
+    // Used by helper for background refraction effect
+    // Aligns precisely with window coordinates
+    // Backward compatibility fallback
     send({ type: "thumb", tabId, url: current.url ?? "", full: true,
            data: await downscale(dataUrl) });
   } catch (e) {
-    // chrome:// 页面、窗口被遮挡、超过频率限制 —— 都是正常跳过。
-    // 但错误必须让 helper 日志看得见：之前这里静默吞错，把「SW 的 fetch
-    // 不支持 data: URL」这种 100% 失败也吞了，缩略图从来没发出去过一张。
-    send({ type: "log", message: `thumb capture failed: ${e}` });
+    const msg = String(e?.message || e);
+    // Suppress repeated activeTab error logs when extension requires reload in brave://extensions
+    if (msg.includes("activeTab")) {
+      // Internal hint - only logged once per connection
+      if (!captureThumbnail._warnedActiveTab) {
+        captureThumbnail._warnedActiveTab = true;
+        send({ type: "log", message: "Hint: Click 'Reload' on TabCircle Bridge in brave://extensions (or chrome://extensions) to enable full thumbnail captures." });
+      }
+    } else {
+      send({ type: "log", message: `thumb capture skipped: ${msg}` });
+    }
   }
 }
 
-/// 原图是整个视口，直接传太大，等比缩到长边 THUMB_MAX_WIDTH。
+/// Downscale full viewport image to THUMB_MAX_WIDTH while preserving aspect ratio.
 ///
-/// **绝对不能裁剪**（以前会按 400×250 居中裁）：helper 拿这张图给切换器浮层当
-/// 折射背景，它要按「浮层盖住了窗口的哪一块」去对齐裁切，而对齐的唯一依据就是
-/// 这张图**完整覆盖视口**、宽高比和视口一致。裁过的图两个前提都不成立，helper
-/// 只能放弃折射降级成模糊。
+/// Preserves aspect ratio for proper alignment in helper overlay.
+/// Alignment depends on full-viewport coverage.
+/// Cropping is deferred to rendering stage in helper UI.
+/// Avoids falling back to plain blur.
 ///
-/// 卡片那边不受影响 —— SwiftUI 用 `aspectRatio(.fill)` + `clipShape` 自己裁，
-/// 观感和以前一样，只是裁剪从扩展侧挪到了渲染侧。
+/// Cards crop independently in UI.
+/// Shifted cropping responsibility to renderer.
 async function downscale(dataUrl) {
-  // 不能用 fetch(dataUrl)：MV3 service worker 的 fetch 只认 http/https，
-  // 对 data: URL 直接抛异常。手动 atob 解 base64 是 SW 里的标准做法。
+  // decode base64 manually in SW since fetch does not support data: URLs in MV3.
+  // Standard atob decode to Uint8Array.
   const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
   const raw = atob(base64);
   const bytes = new Uint8Array(raw.length);
@@ -272,48 +295,48 @@ async function downscale(dataUrl) {
 
 function bytesToBase64(bytes) {
   let binary = "";
-  const CHUNK = 0x8000;   // 一次 apply 太多参数会爆栈
+  const CHUNK = 0x8000;   // Chunk size prevents stack overflow with Function.apply
   for (let i = 0; i < bytes.length; i += CHUNK) {
     binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
   }
   return btoa(binary);
 }
 
-// ── 收藏标签（常驻置顶） ─────────────────────────────────────────────────
+// ── Favorited Tabs (Persistent Pins) ───────────────────────────────────
 //
-// app 侧维护收藏列表（url + title），每次收到配置就核对一遍：
-//   · 该域名一个标签都没有 → 置顶打开（不抢焦点）
-//   · 有标签但都没置顶   → 把第一个补成置顶
-// 按域名识别：webapp 在站内不断跳转，按完整 URL 匹配会反复开重复标签。
-// 只在收到配置时核对（连接建立 / 收藏变更），不做周期性强制 ——
-// 用户会话中手动关掉收藏标签是明确意图，等浏览器下次重启再恢复。
+// Helper manages favorite list (url + title), reconciled on configuration receipt:
+//   - If no tab for domain: open pinned in background
+//   - If tabs exist but none pinned: pin the first one
+// Match by domain to handle web app redirect paths.
+// Reconcile only on config update, avoiding periodic forced overrides.
+// Explicit user closes are respected until next browser restart.
 //
-// 解决的痛点：Chrome 的置顶是窗口级的，关掉带置顶的窗口再退出浏览器，
-// 下次启动置顶标签就没了。收藏列表存在 app 侧，跟浏览器会话完全解耦。
+// Chrome pinned tabs are window-scoped; helper keeps favorites globally persistent.
+// Favorites are decoupled from individual browser windows.
 
 let ensuringFavorites = false;
 
-/// 浏览器启动后的安定期：会话恢复（含置顶标签）需要一点时间，核对跑得
-/// 太早会「没看到恢复中的置顶 → 再开一个」。onStartup 时设置截止时间，
-/// 核对开始前先等到点。
+/// Settle delay after startup to let browser session restore complete.
+/// Prevents creating duplicate pins before restored tabs appear.
+/// Waits until settle deadline before reconciling favorites.
 let startupSettleUntil = 0;
 
-/// 我们自己置顶的 tabId：pinned:true 事件里跳过上报，防止「ensure 补置顶
-/// → 事件上报 → helper 又添一条」的环。去重不再按域名（同域名允许多个
-/// 置顶），这层标记是唯一的防环手段。
+/// Tracks tabs pinned by extension to avoid echo notification loop:
+/// ensures extension-initiated pins are skipped in onUpdated.
+/// Cycle prevention marker.
 const selfPinned = new Set();
 
-/// 我们自己取消置顶的 tabId（helper 的 unpin 命令）：pinned:false 事件里
-/// 跳过「用户取消置顶」上报，防止误删同域名的其他置顶记录。
+/// Tracks tabs unpinned by helper command:
+/// prevents reporting unpin event back to helper.
 const selfUnpinned = new Set();
 
-/// 是否已经收到过带 favorites 字段的配置。
-/// 身份识别完成前 helper 不下发 favorites，这段时间不能跑自动清理 ——
-/// 见 sweepExpiredTabs。SW 重启后归零，等下一份完整配置。
+/// Whether initial config with favorites has been received.
+/// Prevents running auto-sweep before favorites are loaded.
+/// Reset to false on SW restart.
 let favoritesKnown = false;
 
-/// helper 下发的「待补做取消置顶」域名：用户在 app 里删掉置顶记录时，
-/// 这个浏览器不在线，命令没能发出来。下一次核对前先补做。
+/// Domains queued for unpinning while browser was offline.
+/// Processed on next reconciliation.
 let pendingUnpinHosts = [];
 
 function hostOf(url) {
@@ -334,17 +357,17 @@ async function ensureFavorites() {
     const favorites = settings.favorites ?? [];
     const allTabsRaw = await chrome.tabs.query({});
 
-    // 先补做离线期间攒下的取消置顶，再做匹配和收编 —— 顺序是关键：
-    // 浏览器自己的会话恢复会把这些置顶带回来，先被收编扫描看到的话，
-    // 它们又会变成收藏（用户实测：关着浏览器删掉置顶，重开又回来了）。
+    // Apply queued offline unpins first before matching:
+    // session restore brings back old pins, which must be pruned before matching,
+    // otherwise they get re-adopted as favorites.
     const unpinHosts = pendingUnpinHosts;
     pendingUnpinHosts = [];
     const suppressed = new Set();
     if (unpinHosts.length > 0) {
-      // 离线删除的置顶：用户早已表态不要它，重启带回来的这份只是会话
-      // 恢复的残影 —— 直接**关闭**，不留一个孤零零的普通标签。
-      // 唯一例外：它是最后一个标签时关掉会把窗口/浏览器一起带走，
-      // 退化为取消置顶。
+      // Tabs deleted while offline should be closed directly,
+      // without leaving an unpinned orphan tab behind.
+      // If it is the last tab in window, unpin instead of removing.
+      // Fallback to unpin.
       let remaining = allTabsRaw.length;
       for (const t of allTabsRaw) {
         const h = hostOf(t.url ?? "");
@@ -365,17 +388,17 @@ async function ensureFavorites() {
           send({ type: "log", message: `pending unpin failed (${h}): ${e}` });
         }
       }
-      // 现场有没有对应标签都要销账：这次机会已经用掉了
+      // Acknowledge unpins to helper
       send({ type: "unpinsApplied", hosts: unpinHosts });
     }
 
-    // allTabs 是取消置顶之前的快照，里面这些标签还写着 pinned:true ——
-    // 直接摘出去，别让它们参与匹配或收编
+    // Exclude suppressed tabs from matching
+    // Don't let suppressed tabs participate in matching
     const allTabs = allTabsRaw.filter((t) => !suppressed.has(t.id));
-    // 每个收藏认领一个标签，认领过的不再参与后续匹配。
-    // 两遍匹配：先做「最后访问 URL」的精确认领，再做域名兜底 ——
-    // 同域名的两个收藏若单遍处理，前一个会把后一个的标签按域名抢走，
-    // 后一个又去新开一个重复置顶。
+    // Two-pass favorite matching:
+    // Pass 1: exact URL match. Pass 2: host fallback.
+    // Prevents two favorites on the same domain from stealing each other's tab.
+    // Avoids duplicate pins.
     const claimed = new Set();
     const plan = favorites.map((fav) => {
       const targetUrl = fav.currentUrl || fav.url;
@@ -385,9 +408,9 @@ async function ensureFavorites() {
     });
     for (const entry of plan) {
       if (entry.match) continue;
-      // 恢复以「最后访问」为准（标签位语义：把上次的会话带回来）。
-      // 收藏的常常是登录页，登录后重定向到别的域名 —— 只认原始域名
-      // 会「找不到 → 再开一个」，每次重开窗口堆一个重复置顶。
+      // Prefer last visited URL to restore previous session state.
+      // Accounts for login page redirects.
+      // Prevents opening duplicate tabs on redirect.
       const targetUrl = entry.fav.currentUrl || entry.fav.url;
       const curHost = hostOf(targetUrl);
       const origHost = hostOf(entry.fav.url);
@@ -397,10 +420,10 @@ async function ensureFavorites() {
         (origHost ? allTabs.find((t) => free(t) && hostOf(t.url ?? "") === origHost) : null);
       if (entry.match) claimed.add(entry.match.id);
     }
-    // 第三遍：仍没着落的收藏 ↔ 现场没被认领的**置顶**标签，按序配对。
-    // 重启恢复的置顶会因登录重定向漂到别的域名（signin…?callback=flow…），
-    // 精确/域名两遍全落空 —— 但一个不认识的置顶标签存在，本身就说明它是
-    // 某个收藏的化身，直接收编绑定，绝不再开新的（实测：不配对就双置顶）。
+    // Pass 3: match remaining favorites with unclaimed pinned tabs.
+    // Restored pins may drift to login flow URLs;
+    // adopting existing pinned tabs avoids duplicate creations.
+    // Binds to existing pin rather than creating a new one.
     for (const entry of plan) {
       if (entry.match) continue;
       const stray = allTabs.find((t) => t.pinned && !claimed.has(t.id));
@@ -422,9 +445,9 @@ async function ensureFavorites() {
           send({ type: "favoriteBound", id: fav.id, tabId: match.id });
         } else {
           const created = await chrome.tabs.create({ url: targetUrl, pinned: true, active: false });
-          // 部分 Chromium 分支（实测：夸克）的 tabs.create 可能不按规范
-          // 返回 Tab 对象 —— 读 created.id 会抛 undefined 错。拿不到 id
-          // 就跳过绑定，下次核对再收编。
+          // Some Chromium derivatives do not return Tab object from tabs.create;
+          // handle undefined tab ID gracefully.
+          // Skip binding if id is missing.
           if (created?.id !== undefined) {
             selfPinned.add(created.id);
             claimed.add(created.id);
@@ -437,8 +460,8 @@ async function ensureFavorites() {
       }
     }
 
-    // 收编：列表之外的置顶标签（程序没运行时用户置顶的）也报给 helper
-    // 记为收藏 —— 置顶 = 收藏，双向同步。
+    // Report external pinned tabs to helper as favorites:
+    // Pinned = Favorited (two-way sync).
     for (const t of allTabs) {
       if (t.pinned && !claimed.has(t.id) && (t.url ?? "").startsWith("http")) {
         send({ type: "pinnedTab", tabId: t.id, url: t.url, title: t.title ?? "",
@@ -450,46 +473,46 @@ async function ensureFavorites() {
   }
 }
 
-// ── 标签存活时间（Arc 式自动清理） ──────────────────────────────────────
+// ── Tab Lifetime Management (Auto-close idle tabs) ─────────────────────
 //
-// 超过设定时限未被使用的标签自动关闭。判定用 tab.lastAccessed
-// （最近一次激活的时刻，Chrome 121+；拿不到该字段的标签一律不动）。
+// Auto-close tabs exceeding idle threshold using tab.lastAccessed.
+// Tabs without lastAccessed are left untouched.
 //
-// 保护名单（宁可漏清不可错杀）：
-//   · pinned  —— 用户固定 = 明确要留。收藏 ⟺ 置顶，所以这条也是收藏的主防线
-//   · 收藏域名 —— 收藏此刻没有对应置顶标签时的兜底，见 sweepExpiredTabs
-//   · active  —— 各窗口的当前标签。附带效果：每个窗口至少保住一个标签，
-//                绝不会把窗口/浏览器整个关掉
-//   · audible —— 正在出声（后台放歌算「在用」）
-//   · 分组内的标签 —— 进了 tab group 是刻意整理过的
-// 另外只在连着 helper 时清理：TabCircle 没在运行就不该动用户的标签。
+// Protected tabs (never close):
+//   - pinned: explicit user keeps; primary line of defense for favorites
+//   - favorite domains: secondary line of defense
+//   - active: active tab in each window; prevents closing window
+//     keeps at least one tab open per window
+//   - audible: currently playing sound/audio
+//   - tab groups: tabs organized into intentional groups
+// Only clean tabs when actively connected to helper.
 
 const LIFETIME_ALARM = "tabcircle-lifetime";
 const LIFETIME_SWEEP_MINUTES = 5;
 
 async function sweepExpiredTabs() {
   const hours = settings.tabLifetimeHours;
-  // favoritesKnown：helper 在**浏览器身份还没识别出来**时下发的配置**不含**
-  // favorites 字段（那是防止把别家浏览器的置顶恢复进来），但 tabLifetimeHours
-  // 是带着的 —— 中间约 150ms 里我们知道「要清理」却还不知道「哪些是收藏」。
-  // 清理是破坏性动作，失败方向必须是「不动手」。
+  // Only sweep when connected and favorites are known.
+  // Prevents sweeping before favorites list is received.
+  // Avoids race condition during initial handshake.
+  // Destructive action safety policy: do nothing on ambiguity.
   if (!hours || !connected || !favoritesKnown) return;
 
   const cutoff = Date.now() - hours * 3600 * 1000;
   const allTabs = await chrome.tabs.query({});
 
-  // 收藏的第二道防线。
+  // Second line of defense for favorites:
   //
-  // 主防线是 !t.pinned —— 收藏 ⟺ 浏览器置顶，读的是浏览器自己的标志而不是
-  // 另存的一份清单，不会有两份账本漂移。但收藏的标签**确实存在未置顶的瞬间**：
-  // ensureFavorites 正要给恢复回来的标签补置顶（re-pinned 那一步）、分支浏览器
-  // 的 tabs.create 没照做 pinned、上一轮 ensure 抛错留下个普通标签。清理每 5
-  // 分钟跑一次，撞上就把它关了。
+  // Primary defense is !t.pinned; this protects favorite domains
+  // during the transition before they are re-pinned.
+  // Handles edge cases in third-party Chromium builds
+  // where pinned flag is temporarily lost.
+  // Prevents sweep from accidentally closing unpinned favorites.
   //
-  // 关掉不会丢收藏（关闭不算取消置顶，unpinned 上报有 400ms 存活核验），下一轮
-  // ensure 会按最后访问的 URL 重开 —— 但「置顶标签自己消失又冒出来」已经够吓人。
-  // 只护**当前没有对应置顶标签**的收藏所属域名：收藏正常置顶时它本尊由 !t.pinned
-  // 管着，同域名的其他标签该清就清，不搞无差别豁免。
+  // Next ensure pass would re-open, but closing and reopening is disruptive.
+  // Keeps experience smooth.
+  // Guard only domains without an active pin; other tabs under domain can be swept.
+  // Targeted protection without over-exemption.
   const pinnedHosts = new Set(
     allTabs.filter((t) => t.pinned).map((t) => hostOf(t.url ?? "")).filter(Boolean)
   );
@@ -508,21 +531,21 @@ async function sweepExpiredTabs() {
   );
   if (victims.length === 0) return;
 
-  // 清理留痕：哪些标签、多久没用，都写进 helper 日志，
-  // 「我标签怎么没了」必须有处可查。
-  // 列到 40 条为止：存活时间可以设到一年，头一次清理可能一口气关掉几百个，
-  // 全列出来就是一行几十 KB 的日志，反而没法看。
+  // Log swept tabs to helper:
+  // Provides audit trail in helper logs.
+  // Limit to first 40 entries to avoid overwhelming log line length.
+  // Keeps log output clean and readable.
   const LOG_LIMIT = 40;
   const detail = victims
     .slice(0, LOG_LIMIT)
     .map((t) => `${(t.title || t.url || "?").slice(0, 40)} (idle ${Math.round((Date.now() - t.lastAccessed) / 3600000)}h)`)
     .join("; ")
-    + (victims.length > LOG_LIMIT ? `; …另有 ${victims.length - LOG_LIMIT} 个` : "");
+    + (victims.length > LOG_LIMIT ? `; ...and ${victims.length - LOG_LIMIT} more` : "");
   send({ type: "log", message: `lifetime sweep: closing ${victims.length} tab(s) > ${hours}h idle: ${detail}` });
 
   try {
-    // 标记必须先于 remove：onRemoved 是同步触发的，晚一步这批就会被
-    // 记成「手动关闭」—— 而「程序替我关的」恰恰是最需要能找回的那类。
+    // Mark closing reason before calling tabs.remove
+    // so onRemoved synchronously identifies lifetime reason.
     markClosing(victims.map((t) => t.id), "lifetime");
     await chrome.tabs.remove(victims.map((t) => t.id));
   } catch (e) {
@@ -530,25 +553,25 @@ async function sweepExpiredTabs() {
   }
 }
 
-// ── 已关闭标签记录 ──────────────────────────────────────────────────────
+// ── Closed Tab Tracking ────────────────────────────────────────────────
 //
-// 关掉的标签连同「为什么关的」一起上报给 helper 存档，用户能从状态栏找回来。
+// Reports closed tabs with reason to helper for restoration menu.
 //
-// 原因分五类，判定手法照搬同文件里 selfPinned / selfUnpinned 那套「自己动手
-// 前先打标记」：
-//   · lifetime / switcher / unpin —— 我们主动调 tabs.remove，标记必须在
-//     remove **之前**登记（onRemoved 是同步触发的，晚一步就来不及）
-//   · window   —— removeInfo.isWindowClosing，Chrome 直接给的，白捡
-//   · manual   —— 以上都不是，即 ⌘W / 点 ✕ / 中键
+// Five close reasons:
+// pre-marked before operation:
+//   - lifetime / switcher / unpin: initiated by extension/helper
+//     registered before tabs.remove (onRemoved is synchronous)
+//   - window: removeInfo.isWindowClosing from Chrome
+//   - manual: user closed via Cmd+W / click / middle click
 //
-// 有两种关闭**天生记不到**，是 MV3 的硬约束不是缺陷：浏览器整体退出时 SW
-// 跟着一起死，onRemoved 根本不跑（同 onUpdated 里 pinned:false 那段的处境）；
-// 崩溃同理。所以列表里不会有「退出浏览器时开着的那些」。
+// Note: Browser exit terminates SW without running onRemoved.
+// Crashes also cannot be intercepted; MV3 constraint.
+// Browser exit does not generate close records.
 
 const CLOSED_FLUSH_MS = 120;
 const REASON_TTL_MS = 30_000;
 
-/// tabId → {reason, at}：我们自己发起的关闭在这里登记原因。
+/// tabId -> {reason, at}: tracks close reason for self-initiated closures
 const closeReasons = new Map();
 
 function markClosing(tabIds, reason) {
@@ -556,26 +579,26 @@ function markClosing(tabIds, reason) {
   for (const id of tabIds) closeReasons.set(id, { reason, at });
 }
 
-/// 待上报的关闭记录。自动清理一次能关几百个标签 = 几百次 onRemoved，
-/// 逐条发就是几百帧 WebSocket，合并成一条发。
+/// Buffer for closed tab records; merges batch closures into single message.
+/// Avoids spamming WebSocket frames.
 let closedBuffer = [];
 let closedFlushTimer = null;
 
 async function recordClosed(tabId, removeInfo) {
-  // SW 可能正是被这次 onRemoved 唤醒的，此时内存里的影子副本还是空的 ——
-  // 真正的元信息在 storage.session 里（上一轮 pushMRU 存的，那份快照里
-  // 这个标签还活着）。所以必须先 loadMRU 再读。
+  // SW may have been woken up by onRemoved: read metadata from storage.session.
+  // Previous pushMRU snapshot holds the tab info before removal.
+  // Ensure loadMRU completes before lookup.
   await loadMRU();
 
   const meta = tabMeta[tabId];
   const marked = closeReasons.get(tabId);
   closeReasons.delete(tabId);
 
-  // 影子副本里没有 = 这个标签从没进过任何一轮 pushMRU（后台打开且秒关）。
-  // 没有 URL 的记录没有找回价值，直接丢，别往列表里塞空条目。
+  // Untracked tabs (opened and closed immediately in background)
+  // have no restore value and are discarded.
   if (!meta?.url) return;
-  if (meta.incognito) return;                    // 无痕永不落盘
-  if (!meta.url.startsWith("http")) return;      // chrome:// / 扩展页找回没意义
+  if (meta.incognito) return;                    // Never record incognito tabs
+  if (!meta.url.startsWith("http")) return;      // Skip internal and extension scheme URLs
 
   closedBuffer.push({
     url: meta.url,
@@ -592,8 +615,8 @@ async function recordClosed(tabId, removeInfo) {
 function flushClosed() {
   closedFlushTimer = null;
 
-  // remove 抛错时登记的标记没人来取，攒着白占内存。tabId 在一次浏览器会话
-  // 里不复用，所以陈旧标记不会误判成别的标签，纯粹是清理。
+  // Prune stale close reasons after TTL
+  // Clean up memory for failed removes
   const cutoff = Date.now() - REASON_TTL_MS;
   for (const [id, mark] of closeReasons) {
     if (mark.at < cutoff) closeReasons.delete(id);
@@ -602,17 +625,17 @@ function flushClosed() {
   if (closedBuffer.length === 0) return;
   const batch = closedBuffer;
   closedBuffer = [];
-  // 断线时这批直接丢（send 自己会 return）：helper 不在没人接收，而等它
-  // 回来时元信息早已不可查。和「没连着 helper 就不清理标签」同一个口径。
+  // If disconnected, buffer is dropped cleanly.
+  // Aligns with connected-only policy.
   send({ type: "tabsClosed", tabs: batch });
 }
 
-/// 从已关闭列表里找回一个标签。
+/// Reopen a closed tab.
 async function reopenTab(url, active) {
   try {
     const tab = await chrome.tabs.create({ url, active: active !== false });
-    // 用户是从状态栏点进来的，浏览器多半不在前台 —— 光 create 不会把窗口
-    // 提到前面（和 activateTab 里那句同理）。
+    // Reopened tab should focus and bring window to front.
+    // Focus window.
     if (active !== false && tab?.windowId !== undefined) {
       await chrome.windows.update(tab.windowId, { focused: true });
     }
@@ -621,21 +644,21 @@ async function reopenTab(url, active) {
   }
 }
 
-// ── 执行切换 ────────────────────────────────────────────────────────────
+// ── Tab Switch Execution ───────────────────────────────────────────────
 
 async function activateTab(tabId) {
   try {
     const tab = await chrome.tabs.get(tabId);
     await chrome.tabs.update(tabId, { active: true });
-    // 目标可能在别的窗口 —— 光设 active 不会把那个窗口提到前面
+    // Target tab may be in another window; bring that window to front as well.
     await chrome.windows.update(tab.windowId, { focused: true });
   } catch (e) {
-    console.warn("[TabCircle] 切换失败，标签页可能已关闭:", tabId, e);
+    console.warn("[TabCircle] Switch failed, tab may be closed:", tabId, e);
     await forgetTab(tabId);
   }
 }
 
-// ── WebSocket ───────────────────────────────────────────────────────────
+// ── WebSocket Communication ────────────────────────────────────────────
 
 function send(obj) {
   if (!connected) return;
@@ -644,48 +667,48 @@ function send(obj) {
     .catch(() => {});
 }
 
-/// 确保 offscreen document 存在。它一旦创建就常驻，重复调用是安全的。
+/// Ensure offscreen document exists; idempotent.
 async function ensureOffscreen() {
   if (await chrome.offscreen.hasDocument()) return;
   try {
     await chrome.offscreen.createDocument({
       url: OFFSCREEN_PATH,
-      // 没有哪个 reason 是为「保持 WebSocket」定义的，WORKERS 是最贴近的一项：
-      // 我们确实需要一个独立于 service worker 生命周期的执行环境。
+      // WORKERS reason provides an environment independent of SW lifecycle.
+      // Maintains persistent background connection.
       reasons: ["WORKERS"],
       justification: "Maintain a persistent local WebSocket connection to the TabCircle helper.",
     });
   } catch (e) {
-    // 并发调用时可能已经被另一次创建抢先，这不是错误
+    // Concurrent creation race is harmless.
     if (!String(e).includes("Only a single offscreen")) {
-      console.warn("[TabCircle] offscreen 创建失败:", e);
+      console.warn("[TabCircle] offscreen creation failed:", e);
     }
   }
 }
 
 async function connect() {
   await ensureOffscreen();
-  // 让 offscreen 汇报当前状态；没连上的话它会自己重连
+  // Poke offscreen document to report status or reconnect.
   chrome.runtime
     .sendMessage({ target: "offscreen", type: "ws-poke" })
     .catch(() => {});
 }
 
-/// 处理 helper 发来的一条消息（由 offscreen 转发）。
+/// Handle incoming helper message forwarded by offscreen document.
 async function handleHelperMessage(raw) {
   let msg;
   try {
     msg = JSON.parse(raw);
   } catch {
-    return;   // 不是我们的协议，忽略
+    return;   // Ignore non-JSON or external messages
   }
   switch (msg.type) {
     case "switch":
       if (typeof msg.tabId === "number") await activateTab(msg.tabId);
       break;
     case "unpin":
-      // 取消收藏：撤销该域名下所有标签的置顶（收藏核对只补不撤，
-      // 撤销必须由 helper 明确指令）
+      // Unpin tabs for specified hosts:
+      // explicit instruction from helper
       if (Array.isArray(msg.hosts)) {
         const pinned = await chrome.tabs.query({ pinned: true });
         for (const t of pinned) {
@@ -703,21 +726,21 @@ async function handleHelperMessage(raw) {
       }
       break;
     case "close":
-      // 浮层卡片上的 ✕。关闭成功会触发 onRemoved → forgetTab → pushMRU，
-      // 不用在这里重复维护 MRU。
+      // Close button on switcher card.
+      // onRemoved handles MRU update automatically.
       if (typeof msg.tabId === "number") {
         try {
           markClosing([msg.tabId], "switcher");
           await chrome.tabs.remove(msg.tabId);
         } catch (e) {
-          // 标签可能已经没了（用户手动关掉的竞态），清掉本地记录即可
+          // Tab may have already closed; forget locally.
           send({ type: "log", message: `close failed: ${e}` });
           await forgetTab(msg.tabId);
         }
       }
       break;
     case "reopen":
-      // 从已关闭列表里找回一个标签
+      // Reopen tab requested by helper
       if (typeof msg.url === "string" && msg.url.startsWith("http")) {
         await reopenTab(msg.url, msg.active);
       }
@@ -729,8 +752,8 @@ async function handleHelperMessage(raw) {
       await pushMRU();
       break;
     case "settings":
-      // app 推来的配置。范围过滤已移到 helper 侧，这里收下配置后推一份
-      // 全量列表即可（helper 换了过滤条件后需要新数据立即生效）。
+      // Settings from helper: push fresh MRU list to apply changes.
+      // Helper filters on its side.
       if (typeof msg.scopeToWindow === "boolean") {
         settings.scopeToWindow = msg.scopeToWindow;
         pushMRU();
@@ -738,7 +761,14 @@ async function handleHelperMessage(raw) {
       if (typeof msg.tabLifetimeHours === "number") {
         settings.tabLifetimeHours = msg.tabLifetimeHours;
       }
-      // 必须先于 favorites 落位：ensureFavorites 会用到它
+      if (typeof msg.captureThumbnails === "boolean") {
+        settings.captureThumbnails = msg.captureThumbnails;
+        if (!settings.captureThumbnails && thumbTimer) {
+          clearTimeout(thumbTimer);
+          thumbTimer = null;
+        }
+      }
+      // Pending unpins must be set before ensureFavorites.
       if (Array.isArray(msg.pendingUnpinHosts)) {
         pendingUnpinHosts = msg.pendingUnpinHosts;
       }
@@ -751,10 +781,10 @@ async function handleHelperMessage(raw) {
   }
 }
 
-// offscreen 转发上来的连接事件与数据。
-// helper 的消息必须**串行**处理：发送顺序就是语义顺序（先 unpin 后推新
-// 配置），async 处理器并发交错会把顺序打乱 —— 收编扫描在置顶撤掉之前
-// 跑到，就会把刚取消的置顶又加回列表（取消置顶死循环，实测）。
+// Connection events and data forwarded from offscreen:
+// Process messages sequentially to preserve semantic order
+// and avoid race conditions during unpin/reconcile.
+// Prevents re-pin loop.
 let helperQueue = Promise.resolve();
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -764,8 +794,8 @@ chrome.runtime.onMessage.addListener((message) => {
     case "ws-open":
       if (!connected) {
         connected = true;
-        console.log("[TabCircle] 已连接 helper");
-        // 附带扩展版本：helper 核对 major.minor 配套，不一致会提示用户更新扩展
+        console.log("[TabCircle] Connected to helper");
+        // Include extension version for compatibility check
         send({ type: "requestSettings", extVersion: chrome.runtime.getManifest().version });
         pushMRU();
         chrome.tabs
@@ -775,7 +805,10 @@ chrome.runtime.onMessage.addListener((message) => {
       break;
     case "ws-close":
       connected = false;
-      console.log("[TabCircle] 连接断开");
+      console.log("[TabCircle] Connection disconnected");
+      break;
+    case "theme":
+      browserIsDark = message.isDark;
       break;
     case "ws-message":
       helperQueue = helperQueue
@@ -785,23 +818,23 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
-// ── 事件挂载 ────────────────────────────────────────────────────────────
+// ── Event Listeners ────────────────────────────────────────────────────
 
 chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
-  connect();          // 顺带做一次连接自愈
+  connect();          // Auto-heal connection
   touchTab(tabId);
   scheduleThumbnail(tabId, windowId);
 });
 
-// 顺序是关键：recordClosed 要从影子副本里读元信息，而 forgetTab 会触发
-// pushMRU 把这条从副本里清掉。两个都 async，不 await 串起来的话就是在赌
-// 微任务的交错顺序。
+// Sequence is critical: recordClosed reads metadata before forgetTab prunes it.
+// Awaiting both ensures correct order without race.
+// Preserves microtask execution order.
 chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
   await recordClosed(tabId, removeInfo);
   await forgetTab(tabId);
 });
 
-// 切换浏览器窗口时，那个窗口的当前标签页才是「最近使用」的
+// When switching windows, update MRU for the focused tab.
 chrome.windows.onFocusChanged.addListener(async (windowId) => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) return;
   const [tab] = await chrome.tabs.query({ active: true, windowId });
@@ -810,23 +843,23 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
   scheduleThumbnail(tab.id, windowId);
 });
 
-// 标题 / favicon 变了要让 overlay 显示最新的。走节流版：这是全场最吵的事件。
+// Throttled push on title or favicon changes.
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.title || changeInfo.favIconUrl) schedulePush();
-  // 置顶状态变化也要刷新推送 —— 切换器卡片的星标跟着它走
+  // Refresh push on pinned state change.
   if (changeInfo.pinned !== undefined) schedulePush();
 
-  // 用户主动取消置顶（⌘W 关闭走的是 onRemoved，不会触发这里）。
-  // 是否命中收藏由 helper 判定（绑定优先、域名兜底）—— 收藏的事实源
-  // 在 app，SW 重启后本地副本可能还是空的。我们自己发的 unpin 命令也会
-  // 走到这里，但那时收藏已被移除，helper 查无此项、不会成环。
+  // User unpinned a tab.
+  // Helper decides if it belongs to favorites.
+  // Avoid echo loop with selfUnpinned.
+  // Prevents cycle.
   //
-  // ⚠️ 必须延迟核实：窗口/浏览器关闭的 teardown 也会给置顶标签发一次
-  // pinned:false（实测：上报后 33ms 连接就断了，收藏被误删）。400ms 后
-  // 标签还活着且仍未置顶，才算用户主动取消；标签没了就是关闭，忽略。
-  // 浏览器整体退出时 SW 一起死，这个回调根本不会跑 —— 天然安全。
-  // 用户置顶了一个标签 → 收编进收藏列表（置顶 = 收藏）。
-  // 自家 ensure 补的置顶（selfPinned 标记）跳过，防环。
+  // Verify after 400ms delay: window/browser close triggers transient pinned:false.
+  // If tab is still alive and unpinned, report to helper;
+  // if tab is gone, it was closed rather than unpinned.
+  // Naturally safe on browser exit.
+  // User pinned a tab -> report to helper as favorite.
+  // Skip self-pinned tabs to prevent loop.
   if (changeInfo.pinned === true) {
     if (selfPinned.has(tabId)) {
       selfPinned.delete(tabId);
@@ -838,7 +871,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
   if (changeInfo.pinned === false) {
     if (selfUnpinned.has(tabId)) {
-      // 自家 unpin 命令的回声，不当作用户动作
+      // Ignore echo from our own unpin command
       selfUnpinned.delete(tabId);
       return;
     }
@@ -850,19 +883,19 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
           send({ type: "unpinned", host: hostOf(live.url ?? "") ?? fallbackHost, tabId });
         }
       } catch {
-        // 标签已不存在 —— 是关闭不是取消置顶
+        // Tab no longer exists: closed rather than unpinned
       }
     }, 400);
   }
 });
 
-// 标签页被拖到别的窗口 —— 按窗口过滤时列表内容会变。
-// tabId 不变，所以 mru 里的历史position 自动跟着走，不用特殊处理。
+// Tab moved between windows; refresh MRU.
+// Position in MRU persists naturally.
 chrome.tabs.onAttached.addListener(() => pushMRU());
 chrome.tabs.onDetached.addListener(() => pushMRU());
 
-// 工具栏图标点击 → 让 app 打开它的原生设置窗口。
-// 设置只有一个入口，浏览器这边不再单开一个页面。
+// Action button clicked -> request helper to open settings.
+// Single entry point for settings in helper UI.
 chrome.action.onClicked.addListener(() => {
   connect();
   send({ type: "openSettings" });
@@ -883,8 +916,8 @@ chrome.runtime.onInstalled.addListener(() => {
   ensureAlarms();
 });
 
-// 兜底：helper 重启或连接意外断掉时，最多 30s 内恢复。
-// 正常情况下连接由 helper 的定时 ping 维持，走不到这里。
+// Fallback: reconnect on alarm if connection was lost.
+// Helper ping keeps connection alive normally.
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === RECONNECT_ALARM) connect();
   if (alarm.name === LIFETIME_ALARM) sweepExpiredTabs();

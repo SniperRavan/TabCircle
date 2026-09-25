@@ -1,8 +1,8 @@
 import Foundation
 
-/// 日志同时写 stdout 和文件。文件每次启动截断，保证读到的永远是本次运行。
+/// Logs simultaneously to stdout and file. The log file is truncated on startup so it always reflects the current run.
 ///
-/// 放 macOS 标准日志目录，不要用仓库路径 —— 那样只对开发者本人的机器成立。
+/// Placed in the standard macOS logs directory rather than the repository directory.
 let kLogPath: String = {
     let directory = FileManager.default
         .homeDirectoryForCurrentUser
@@ -24,14 +24,13 @@ private let logHandle: FileHandle? = {
 
 private let logQueue = DispatchQueue(label: "com.tabcircle.log")
 
-/// 当前跑的这个二进制是什么时候编译的。
+/// Timestamp when the running binary was compiled.
 ///
-/// 排查「改了代码没生效」时第一眼要看的东西 —— 忘记重启 helper 而对着旧进程
-/// 反复试，已经浪费过一轮了。日志第一行写死它，一眼就能判断新鲜度。
+/// Useful for confirming that binary updates have taken effect.
 func binaryBuildTime() -> String {
     let path = CommandLine.arguments.first ?? ""
     guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-          let date = attrs[.modificationDate] as? Date else { return "未知" }
+          let date = attrs[.modificationDate] as? Date else { return "unknown" }
     let f = DateFormatter()
     f.dateFormat = "MM-dd HH:mm:ss"
     return f.string(from: date)
@@ -41,7 +40,7 @@ func log(_ message: String) {
     let line = "[\(logFormatter.string(from: Date()))] \(message)"
     print(line)
     fflush(stdout)
-    // 写文件放到自己的队列上：event tap 回调链路上不能有同步磁盘 IO
+    // File writing is dispatched to its own queue: event tap callback path must not have synchronous disk I/O
     logQueue.async {
         if let data = (line + "\n").data(using: .utf8) {
             logHandle?.write(data)

@@ -5,6 +5,7 @@
   "description": "Bridges the MRU tab order to the TabCircle helper and executes switch commands.",
   "permissions": [
     "tabs",
+    "activeTab",
     "storage",
     "alarms",
     "offscreen"

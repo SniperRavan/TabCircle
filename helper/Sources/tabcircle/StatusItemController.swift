@@ -1,104 +1,92 @@
 import AppKit
 
-/// 菜单栏图标与菜单。
+/// Menu bar icon and status menu.
 ///
-/// TabCircle 是 `LSUIElement`，没有 Dock 图标也没有窗口 —— 菜单栏是它唯一
-/// 可见的部分，也是「它到底还活着吗」的唯一答案。所以状态行必须如实反映
-/// 扩展的连接情况，而不只是摆个图标。
+/// TabCircle is an `LSUIElement` without a Dock icon or main window — the menu bar is its only
+/// visible presence and the only indicator of whether it is running. The status line must accurately
+/// reflect the extension's connection state rather than just showing a static icon.
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
 
-    /// 浏览器行（每个已连接浏览器一行，各带自己的标签子菜单）。
-    /// 每次菜单展开时现拆现建（menuNeedsUpdate），不做增量维护 ——
-    /// 标签随时在变，缓存一份反而要操心失效。
+    /// Browser rows (one row per connected browser, each with its own tab submenu).
+    /// Rebuilt on every menu open (`menuNeedsUpdate`) without incremental caching —
+    /// tabs change frequently, so caching would require complex invalidation logic.
     private var browserItems: [NSMenuItem] = []
 
-    /// 浏览器行的数据源（活动浏览器排最前）。
+    /// Data source for browser rows (active browser sorted first).
     var menuBrowsersProvider: (() -> [MRUController.MenuBrowser])?
-    /// 点了某浏览器子菜单里的标签。参数 (tab.id, 浏览器 bundle id)。
+    /// Clicked a tab item in a browser submenu. Parameters: (tab.id, browser bundle id).
     var onPickTabInBrowser: ((Int, String) -> Void)?
-    /// 点了「最近关闭」里的一条。参数 (ClosedTab.id, 浏览器 bundle id)。
+    /// Clicked an item in "Recently Closed". Parameters: (ClosedTab.id, browser bundle id).
     var onReopenClosedTab: ((String, String) -> Void)?
-    /// 清空某浏览器的已关闭记录。参数是浏览器 bundle id。
+    /// Cleared closed tab history for a browser. Parameter: browser bundle id.
     var onClearClosedTabs: ((String) -> Void)?
 
-    /// 「收藏当前标签」菜单项。标题/图标随当前标签的收藏状态切换。
+    /// "Pin Current Tab" menu item. Title and icon toggle according to pin state.
     private let favoriteItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    /// 当前标签是否已收藏；nil = 没有当前标签（未连接），菜单项置灰。
+    /// Whether the current tab is pinned; nil = no current tab (disconnected), menu item disabled.
     var favoriteState: (() -> Bool?)?
-    /// 点了「收藏 / 取消收藏当前标签」。
+    /// Clicked "Pin / Unpin Current Tab".
     var onToggleFavorite: (() -> Void)?
-    /// 置顶快捷键（菜单项右侧显示用）。nil = 未设置，不显示。
+    /// Pin shortcut (displayed on the right side of the menu item). nil = not configured.
     var pinHotkeyProvider: (() -> (key: String, modifiers: NSEvent.ModifierFlags)?)?
 
-    /// 「收藏的文件夹」区。文件夹行每次展开时现拆现建（同浏览器行），
-    /// 插在 sepAfterPin 下方。「收藏当前 Finder 目录」和「置顶当前标签」
-    /// 共用上下文动作槽位（互斥显示）。
+    /// "Favorite Folders" section. Folder rows are rebuilt dynamically on menu open,
+    /// inserted below sepAfterPin. "Add Current Finder Folder" and "Pin Current Tab"
+    /// share the contextual action slot (mutually exclusive).
     private var folderItems: [NSMenuItem] = []
     private let addFinderFolderItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    /// 「添加文件夹…」：弹目录选择面板收藏任意目录。常驻在文件夹列表末尾，
-    /// 不看前台 —— 「收藏当前 Finder 目录」只在 Finder 前台出现，别的 App
-    /// 下原来没有任何收藏入口（2026-09-04 用户要求）。
+    /// "Add Folder…": Displays an open panel to add any folder. Persistently stays at
+    /// the end of the folder list regardless of foreground app.
     private let addFolderItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
 
-    /// 「把当前 App 加进 / 移出排除名单」。前台不是浏览器时才出现 ——
-    /// 刚被抢了键的那一刻，人就在那个 App 里，比翻设置快得多。
-    /// 不和置顶 / Finder 那两项共用槽位：它俩互斥，这条跟 Finder 那条
-    /// 并不互斥（Finder 自己也用着 ⌃⇥，照样该能一键排掉）。
+    /// "Add / Remove Current App from Exclusion List". Visible only when foreground app is not a browser.
+    /// Right when a shortcut conflict occurs, the user is in that app, which is much faster than opening settings.
     private let excludeAppItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    /// 菜单打开那一刻记下的前台 App，供点击时使用 —— 点下去的时候前台
-    /// 已经是我们自己了，那会儿再查就晚了。
+    /// The frontmost app captured at the moment the menu opens.
     private var frontAppForExclude: (bundleID: String, name: String)?
 
-    /// 这个 App 在不在排除名单里（决定菜单项是加还是移出）。
+    /// Whether this app is in the exclusion list.
     var isAppExcluded: ((String) -> Bool)?
-    /// 点了排除 / 取消排除。参数是前台 App 的 bundle id 和显示名。
+    /// Clicked exclude / stop excluding. Parameters: bundle id and display name.
     var onToggleExcludeApp: ((String, String) -> Void)?
-    /// 全局切换器开着没有。关着时它一个键都不拦，这一项没有意义，整项隐藏。
+    /// Whether the global switcher is enabled. If disabled, key interception is off, so hide this item.
     var globalSwitcherEnabled: (() -> Bool)?
 
-    /// 动作槽前后的两道分隔线。动作项按前台上下文显隐后，相邻的分隔线
-    /// 会叠在一起，得跟着收敛（见 menuNeedsUpdate）。每次 buildMenu
-    /// 重建新实例，不跨菜单复用；sepAfterPin 兼任文件夹列表的插入锚点。
+    /// Separators before and after the action slot. Cleaned up dynamically depending on contextual visibility.
     private var sepAfterStatus = NSMenuItem.separator()
     private var sepAfterPin = NSMenuItem.separator()
 
-    /// 收藏的文件夹列表数据源。
+    /// Data source for favorite folders.
     var favoriteFoldersProvider: (() -> [FavoriteFolder])?
-    /// 平铺区容量（设置 → 文件夹管理）。nil 用内置默认值。
+    /// Inline folder limit (Settings -> Folder Management). nil uses default.
     var inlineFolderLimitProvider: (() -> Int)?
-    /// 点了「收藏当前 Finder 目录」。
+    /// Clicked "Add Current Finder Folder".
     var onAddFinderFolder: (() -> Void)?
-    /// 在「添加文件夹…」面板里选定了一个目录。参数是所选路径，
-    /// 返回是否真的进了收藏（无效路径返回 false，不弹菜单）。
+    /// Selected a directory in "Add Folder…". Returns whether it was successfully added.
     var onAddFolder: ((String) -> Bool)?
-    /// 点了某文件夹的「取消收藏」。参数是标准化路径。
+    /// Clicked "Remove from Favorites" for a folder.
     var onRemoveFolder: ((String) -> Void)?
-    /// 某文件夹刚被某个打开方式打开（记录最近使用：平铺区按文件夹的、
-    /// 「打开方式」按条目的）。参数是 (标准化路径, 打开方式)。
+    /// A folder was opened with an opener app (records recency). Parameters: (normalized path, opener app).
     var onFolderOpened: ((String, OpenerApp) -> Void)?
-    /// 「打开方式」的最终列表。过滤和 MRU 排序在数据侧做（OpenerCatalog），
-    /// 菜单只管展示。
+    /// Opener apps list for folders.
     var folderOpenersProvider: (() -> [OpenerApp])?
 
-    /// 「扩展需要更新」警告项。文案由 provider 给，nil = 隐藏。
+    /// "Extension update required" warning item.
     private let warningItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     var extensionWarning: (() -> String?)?
     var onExtensionWarningClick: (() -> Void)?
 
-    /// 打开 app 的设置窗口。
+    /// Open app settings window.
     var onOpenSettings: (() -> Void)?
-    /// 未授权状态下点「授权」。
+    /// Clicked "Authorize" in unauthorized state.
     var onRequestAuthorization: (() -> Void)?
 
-    /// 未授权模式：菜单里只留授权入口和退出。
-    ///
-    /// 关键是这个入口必须在**菜单**里而不是窗口里 —— PermissionFlow 的浮层只在
-    /// 系统设置是前台应用时可见，任何属于我们自己的窗口都会把它挤掉。菜单点完
-    /// 就收起，不占前台，这正是 PasteMemo 那边一直好用的原因。
+    /// Unauthorized mode: Menu shows only authorization prompt and quit.
+    /// Must stay in a menu rather than a window so it does not steal focus from System Settings.
     private var unauthorized = false
 
     func showUnauthorized() {
@@ -112,8 +100,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             button.image = image
             button.alphaValue = 1.0
         }
-        statusLine.title = L10n.t("未授权 —— 需要「辅助功能」权限",
-                                  "Not authorized — Accessibility permission required")
+        statusLine.title = L10n.t("Not authorized — Accessibility permission required")
         statusLine.icon = Self.symbol("exclamationmark.triangle")
     }
     var onCheckForUpdates: (() -> Void)?
@@ -128,29 +115,25 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         render(connected: false, tabCount: 0, browserName: nil)
     }
 
-    // MARK: - 菜单
+    // MARK: - Menu
 
     private func buildMenu() {
-        // statusLine / favoriteItem 是复用的存储属性，而 NSMenuItem 同一时刻
-        // 只能属于一个菜单 —— 不先从旧菜单摘下来，第二次 buildMenu（init 后的
-        // showUnauthorized、或语言切换的 rebuildMenu）会在 insertItem 处抛
-        // NSInternalInconsistencyException 直接崩掉。
+        // statusLine / favoriteItem are reused stored properties, and an NSMenuItem can only
+        // belong to one menu at a time. Must remove from old menu before inserting.
         statusLine.menu?.removeItem(statusLine)
         favoriteItem.menu?.removeItem(favoriteItem)
         warningItem.menu?.removeItem(warningItem)
         addFinderFolderItem.menu?.removeItem(addFinderFolderItem)
 
         let menu = NSMenu()
-        // 自动启用会把「子菜单还是空的」的状态行判成禁用（子菜单在展开时才
-        // 填充，父项灰着就永远展不开 —— 鸡生蛋死锁）。改手动管理：状态行
-        // 的可用性跟随子菜单挂载（见 render），其余动作项默认可用。
+        // autoenablesItems disabled to prevent empty submenus from getting permanently disabled.
         menu.autoenablesItems = false
         menu.delegate = self
 
         statusLine.isEnabled = false
         menu.addItem(statusLine)
 
-        // 扩展版本警告（橙色），menuNeedsUpdate 时按实际状态显隐
+        // Extension version warning item, updated in menuNeedsUpdate.
         warningItem.target = self
         warningItem.action = #selector(warningClicked)
         warningItem.isHidden = true
@@ -159,17 +142,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         sepAfterStatus = .separator()
         menu.addItem(sepAfterStatus)
 
-        // 菜单项图标要么全有要么全无 —— 系统会给个别标准项（如「设置」）
-        // 自动配图标，其余项没有就参差不齐，所以统一显式给全。
+        // Standardize icons: either all items have icons or none.
         if unauthorized {
-            let grant = NSMenuItem(title: L10n.t("授权 TabCircle…", "Authorize TabCircle…"),
+            let grant = NSMenuItem(title: L10n.t("Authorize TabCircle…"),
                                    action: #selector(requestAuthorization), keyEquivalent: "")
             grant.target = self
             grant.icon = Self.symbol("lock.shield")
             menu.addItem(grant)
             menu.addItem(.separator())
 
-            let quitOnly = NSMenuItem(title: L10n.t("退出 TabCircle", "Quit TabCircle"),
+            let quitOnly = NSMenuItem(title: L10n.t("Quit TabCircle"),
                                       action: #selector(quit), keyEquivalent: "q")
             quitOnly.target = self
             quitOnly.icon = Self.symbol("power")
@@ -180,16 +162,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         favoriteItem.target = self
         favoriteItem.action = #selector(toggleFavorite)
-        favoriteItem.title = L10n.t("置顶当前标签", "Pin Current Tab")
+        favoriteItem.title = L10n.t("Pin Current Tab")
         favoriteItem.icon = Self.symbol("pin")
-        favoriteItem.isEnabled = false   // menuNeedsUpdate 时按当前标签刷新
+        favoriteItem.isEnabled = false   // Refreshed in menuNeedsUpdate
         menu.addItem(favoriteItem)
 
-        // 和「置顶当前标签」共用同一个槽位：置顶只在浏览器前台出现、这条
-        // 只在 Finder 前台出现，互斥，永远不会同时可见（2026-09-02 用户定的）
+        // Shared slot with "Pin Current Tab": mutually exclusive based on frontmost app.
         addFinderFolderItem.target = self
         addFinderFolderItem.action = #selector(addFinderFolder)
-        addFinderFolderItem.title = L10n.t("收藏当前 Finder 目录", "Add Current Finder Folder")
+        addFinderFolderItem.title = L10n.t("Add Current Finder Folder")
         addFinderFolderItem.icon = Self.symbol("folder.badge.plus")
         addFinderFolderItem.isEnabled = true
         menu.addItem(addFinderFolderItem)
@@ -202,23 +183,22 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         sepAfterPin = .separator()
         menu.addItem(sepAfterPin)
 
-        // 收藏的文件夹列表在 menuNeedsUpdate 时插到 sepAfterPin 下方，
-        // 「添加文件夹…」固定压在列表末尾（插入点在它上方，自然排到最后）
+        // Favorite folders list inserted below sepAfterPin, "Add Folder…" stays at bottom.
         addFolderItem.target = self
         addFolderItem.action = #selector(pickFolder)
-        addFolderItem.title = L10n.t("添加文件夹…", "Add Folder…")
+        addFolderItem.title = L10n.t("Add Folder…")
         addFolderItem.icon = Self.symbol("plus.rectangle.on.folder")
         addFolderItem.isEnabled = true
         menu.addItem(addFolderItem)
 
         menu.addItem(.separator())
 
-        let updates = NSMenuItem(title: L10n.t("检查更新…", "Check for Updates…"), action: #selector(checkForUpdates), keyEquivalent: "")
+        let updates = NSMenuItem(title: L10n.t("Check for Updates…"), action: #selector(checkForUpdates), keyEquivalent: "")
         updates.target = self
         updates.icon = Self.symbol("arrow.triangle.2.circlepath")
         menu.addItem(updates)
 
-        let settings = NSMenuItem(title: L10n.t("设置…", "Settings…"),
+        let settings = NSMenuItem(title: L10n.t("Settings…"),
                                   action: #selector(openSettings),
                                   keyEquivalent: ",")
         settings.target = self
@@ -227,7 +207,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let quit = NSMenuItem(title: L10n.t("退出 TabCircle", "Quit TabCircle"), action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(title: L10n.t("Quit TabCircle"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         quit.icon = Self.symbol("power")
         menu.addItem(quit)
@@ -239,46 +219,38 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         NSImage(systemSymbolName: name, accessibilityDescription: nil)
     }
 
-    /// 语言变了要重建菜单：菜单项标题是创建时写死的，不会自己更新。
+    /// Rebuilds the menu on language or configuration change.
     func rebuildMenu() {
         buildMenu()
         render(connected: connected, tabCount: lastTabCount, browserName: lastBrowserName)
     }
 
-    // MARK: - 状态
+    // MARK: - Status
 
-    /// browserName：活动浏览器的显示名。多浏览器时账本随前台切换，
-    /// 名字必须点明这是谁的标签。
+    /// browserName: Display name of active browser.
     func render(connected: Bool, tabCount: Int, browserName: String?) {
         self.connected = connected
         self.lastTabCount = tabCount
         self.lastBrowserName = browserName
 
         statusItem.button?.image = Self.cardIcon
-        // 断开时压暗图标：不换符号，位置和形状保持稳定，只是"灰掉"
+        // Dim icon when disconnected without changing symbol geometry.
         statusItem.button?.alphaValue = connected ? 1.0 : 0.45
 
-        // 连接时状态行被浏览器行取代（menuNeedsUpdate 时构建），
-        // 只有未连接时它才出场
-        statusLine.title = L10n.t("扩展未连接", "Extension not connected")
+        // Status line is shown only when disconnected.
+        statusLine.title = L10n.t("Extension not connected")
         statusLine.icon = Self.symbol("exclamationmark.circle")
         statusLine.isEnabled = false
     }
 
-    // MARK: - 标签子菜单
+    // MARK: - Tab Submenu
 
-    /// 主菜单每次打开时把浏览器行和它们的子菜单一次性建好 —— 不能等
-    /// 子菜单自己展开时再填：空子菜单的父项会被判成禁用，永远展不开
-    /// （2026-08-20 实测截图）。「置顶当前标签」等动态项也在这时刷新。
+    /// Builds browser rows and submenus on every menu open.
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === statusItem.menu else { return }
         refreshBrowserLines(in: menu)
 
-        // 动作项跟着前台上下文走：「置顶当前标签」只在浏览器前台时出现，
-        // 「收藏当前 Finder 目录」只在 Finder 前台时出现 —— 不相干的时候
-        // 点了也「成功」，只会让人懵（2026-09-02 用户反馈）。
-        // 状态栏菜单不抢激活（accessory app，弹 alert 都得显式 NSApp.activate
-        // 就是旁证），所以打开菜单这一刻 frontmost 还是用户正在用的 App。
+        // Action items adjust to frontmost context.
         let frontApp = NSWorkspace.shared.frontmostApplication
         let front = frontApp?.bundleIdentifier
         let pinVisible = refreshFavoriteItem(browserIsFront: BrowserSupport.isSupported(front))
@@ -288,16 +260,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         refreshFolderLines(in: menu)
         refreshWarningItem()
 
-        // 动作槽按前台显隐后，它和文件夹区之间那道分隔线会叠到上一道上：
-        // 只在动作槽可见时要。文件夹区因「添加文件夹…」常驻而永远有内容，
-        // 顶上那道分隔线不用收敛。
+        // Clean up consecutive separators.
         if !unauthorized {
             sepAfterPin.isHidden = !(pinVisible || finderIsFront || excludeVisible)
         }
     }
 
-    /// 每个已连接浏览器一行：「Chrome · 5 个标签 ▸」，行首是浏览器图标，
-    /// 子菜单是它自己的标签列表。未连接时一行都没有，statusLine 顶上。
+    /// One row per connected browser.
     private func refreshBrowserLines(in menu: NSMenu) {
         for item in browserItems { menu.removeItem(item) }
         browserItems.removeAll()
@@ -309,8 +278,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         var insertIndex = menu.index(of: statusLine) + 1
         for browser in browsers {
             let count = browser.entries.count
-            let item = NSMenuItem(title: L10n.t("\(browser.name) · \(count) 个标签",
-                                                "\(browser.name) · \(count) tab\(count == 1 ? "" : "s")"),
+            let item = NSMenuItem(title: L10n.t("\(browser.name) · \(count) tab\(count == 1 ? "" : "s")"),
                                   action: nil, keyEquivalent: "")
             item.icon = Self.browserIcon(browser.bundleID)
             let submenu = NSMenu()
@@ -324,7 +292,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// 浏览器 App 图标缩到菜单标准的 16pt。
+    /// Resizes browser app icon to standard 16pt.
     private static func browserIcon(_ bundleID: String) -> NSImage? {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             return symbol("globe")
@@ -353,8 +321,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         onExtensionWarningClick?()
     }
 
-    /// 返回菜单项是否可见。浏览器前台时藏起来 —— 在浏览器里排除浏览器
-    /// 没有意义（那个键本来就归浏览器内切换器），我们自己同理。
+    /// Returns whether the menu item is visible. Hidden when browser is frontmost.
     private func refreshExcludeItem(_ app: NSRunningApplication?) -> Bool {
         frontAppForExclude = nil
         excludeAppItem.isHidden = true
@@ -367,13 +334,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let name = app.localizedName ?? bundleID
         frontAppForExclude = (bundleID, name)
         excludeAppItem.isHidden = false
-        // 图标跟着状态走（同置顶那条）：举手 = 拦下这个 App 的键，
-        // 划掉的举手 = 不再拦。固定一个禁止号的话，「取消排除」读起来
-        // 成了「禁止取消」。
         let excluded = isAppExcluded?(bundleID) ?? false
         excludeAppItem.title = excluded
-            ? L10n.t("取消排除 \(name)", "Stop Excluding \(name)")
-            : L10n.t("排除 \(name)", "Exclude \(name)")
+            ? L10n.t("Stop Excluding \(name)")
+            : L10n.t("Exclude \(name)")
         excludeAppItem.icon = Self.symbol(excluded ? "hand.raised.slash" : "hand.raised")
         return true
     }
@@ -383,22 +347,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         onToggleExcludeApp?(app.bundleID, app.name)
     }
 
-    /// 返回菜单项是否可见（浏览器不在前台时整项隐藏）。
+    /// Returns whether the favorite menu item is visible.
     private func refreshFavoriteItem(browserIsFront: Bool) -> Bool {
         favoriteItem.isHidden = !browserIsFront
         guard browserIsFront else { return false }
         if let isFavorited = favoriteState?() {
             favoriteItem.isEnabled = true
             favoriteItem.title = isFavorited
-                ? L10n.t("取消置顶当前标签", "Unpin Current Tab")
-                : L10n.t("置顶当前标签", "Pin Current Tab")
+                ? L10n.t("Unpin Current Tab")
+                : L10n.t("Pin Current Tab")
             favoriteItem.icon = Self.symbol(isFavorited ? "pin.fill" : "pin")
         } else {
             favoriteItem.isEnabled = false
-            favoriteItem.title = L10n.t("置顶当前标签", "Pin Current Tab")
+            favoriteItem.title = L10n.t("Pin Current Tab")
             favoriteItem.icon = Self.symbol("pin")
         }
-        // 设置了快捷键就用系统原生方式显示在菜单项右侧
         if let hotkey = pinHotkeyProvider?() {
             favoriteItem.keyEquivalent = hotkey.key
             favoriteItem.keyEquivalentModifierMask = hotkey.modifiers
@@ -413,10 +376,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let entries = browser.entries
 
-        // 多窗口时按窗口分组（组头小灰字），组的顺序 = 窗口在 MRU 里首次
-        // 出现的顺序，当前窗口天然排最前；单窗口不加组头，保持干净。
-        // 注意「只切换当前窗口」开着时扩展只推当前窗口的标签，此时这里
-        // 天然只有一组 —— 菜单范围和状态行的计数、切换器保持一致。
+        // Group by window when multiple windows exist.
         var windowOrder: [Int] = []
         for entry in entries where !windowOrder.contains(entry.tab.windowId) {
             windowOrder.append(entry.tab.windowId)
@@ -426,7 +386,6 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             let group = entries.filter { $0.tab.windowId == windowId }
             if windowOrder.count > 1 {
                 menu.addItem(.sectionHeader(title: L10n.t(
-                    "窗口 \(groupIndex + 1) · \(group.count) 个标签",
                     "Window \(groupIndex + 1) · \(group.count) tab\(group.count == 1 ? "" : "s")")))
             }
             for entry in group {
@@ -434,15 +393,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 let title = raw.count > 60 ? String(raw.prefix(60)) + "…" : raw
                 let item = NSMenuItem(title: title, action: #selector(pickTab(_:)), keyEquivalent: "")
                 item.target = self
-                // 标签 id 在不同浏览器间会撞号，必须连浏览器身份一起带上
                 item.representedObject = ["tabId": entry.tab.id, "browser": browser.bundleID] as [String: Any]
                 item.icon = Self.faviconIcon(entry.icon)
                 if entry.tab.id == entries.first?.tab.id {
-                    item.state = .on   // MRU 首位就是当前标签
+                    item.state = .on   // MRU first entry is current tab
                 }
-                // 右侧灰字徽标：最近使用时间。Chrome 只给 lastAccessed
-                // （最近使用），不给创建时间 —— 最近使用也正好和 MRU 排序、
-                // 存活时间清理的判定口径一致。
                 if let rel = entry.tab.relativeLastAccessed {
                     item.badge = NSMenuItemBadge(string: rel)
                 }
@@ -453,21 +408,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         fillClosedSection(menu, browser: browser)
     }
 
-    /// 活标签之后的「最近关闭」一段：点一条即找回。
-    ///
-    /// 一条都没有时整段不出现 —— 刚装上、还没关过任何标签的用户不该
-    /// 对着一个空标题和一个「清空」按钮发愣。
+    /// Recently closed tabs section. Hidden if empty.
     private func fillClosedSection(_ menu: NSMenu, browser: MRUController.MenuBrowser) {
         guard !browser.closed.isEmpty else { return }
 
         menu.addItem(.separator())
-        // 存档比列出来的多时，标题就得说清「你看到的是最近 N 条」——
-        // 否则下面那个「清空」会显得只清这几条。
         let shown = browser.closed.count
         let total = max(browser.closedTotal, shown)
         menu.addItem(.sectionHeader(title: total > shown
-            ? L10n.t("最近关闭 · \(shown) / \(total)", "Recently closed · \(shown) of \(total)")
-            : L10n.t("最近关闭 · \(shown) 个", "Recently closed · \(shown)")))
+            ? L10n.t("Recently closed · \(shown) of \(total)")
+            : L10n.t("Recently closed · \(shown)")))
 
         for entry in browser.closed {
             let raw = entry.tab.displayTitle
@@ -477,19 +427,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             item.representedObject = ["closedId": entry.tab.id,
                                       "browser": browser.bundleID] as [String: Any]
             item.icon = Self.faviconIcon(entry.icon)
-            // 徽标里带上关闭原因：「程序替我关的」和「我自己关的」是完全不同
-            // 的两件事，不标出来用户无从判断该不该找回它。
             let reason = entry.tab.reason.label
             item.badge = NSMenuItemBadge(
                 string: entry.tab.relativeClosedAt.map { "\(reason) · \($0)" } ?? reason)
             menu.addItem(item)
         }
 
-        // 隔开再放清空：紧挨着最后一条标签的话，冲着「找回」去的点击很容易
-        // 顺手多滑一格，而这个动作没有撤销。
         menu.addItem(.separator())
-        let clear = NSMenuItem(title: L10n.t("清空全部 \(total) 条记录",
-                                             "Clear All \(total) Records"),
+        let clear = NSMenuItem(title: L10n.t("Clear All \(total) Records"),
                                action: #selector(clearClosed(_:)), keyEquivalent: "")
         clear.target = self
         clear.representedObject = browser.bundleID
@@ -497,33 +442,27 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(clear)
     }
 
-    /// favicon 统一缩到菜单标准的 16pt；没缓存到的用 globe 占位
-    /// （图标要么全有要么全无）。
+    /// Standardize favicon size to 16pt.
     private static func faviconIcon(_ icon: NSImage?) -> NSImage? {
         guard let icon, let copy = icon.copy() as? NSImage else { return symbol("globe") }
         copy.size = NSSize(width: 16, height: 16)
         return copy
     }
 
-    // MARK: - 收藏的文件夹
+    // MARK: - Favorite Folders
 
-    /// 平铺区容量的兜底值：按最近打开排的前几个直接躺在主菜单里，
-    /// 其余收进「更多 ▸」—— 收藏几十个也不会把主菜单挤爆。
-    /// 实际数量由设置给（inlineFolderLimitProvider），这里只在没接上时用。
+    /// Default inline folder limit.
     private static let kInlineFolderLimit = AppSettings.defaultInlineFolderLimit
 
-    /// 「收藏的文件夹」列表：最近打开的前几个平铺，溢出的进「更多 ▸」，
-    /// 每条的子菜单列出能打开它的 App。列表**始终显示**（有收藏就列）——
-    /// 在任何 App 里都要能一键打开项目，这是功能本体。区头也始终画：
-    /// 没有收藏时它下面只剩「添加文件夹…」，正好点明那一项是干什么的。
+    /// Favorite folders list: top recent folders inline, overflow in "More ▸".
     private func refreshFolderLines(in menu: NSMenu) {
         for item in folderItems { item.menu?.removeItem(item) }
         folderItems.removeAll()
-        // 未授权菜单里没有这一区
+        // Hidden in unauthorized mode.
         guard sepAfterPin.menu === menu else { return }
 
         var insertIndex = menu.index(of: sepAfterPin) + 1
-        let header = NSMenuItem.sectionHeader(title: L10n.t("收藏的文件夹", "Favorite Folders"))
+        let header = NSMenuItem.sectionHeader(title: L10n.t("Favorite Folders"))
         menu.insertItem(header, at: insertIndex)
         folderItems.append(header)
         insertIndex += 1
@@ -531,11 +470,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let folders = FavoriteFolderStore.byRecency(favoriteFoldersProvider?() ?? [])
         guard !folders.isEmpty else { return }
 
-        // 「能打开文件夹的 App」查一次全体共用：查询按内容类型
-        // （public.folder）走，跟具体是哪个文件夹无关。
+        // Query opener apps once for all folders.
         let openers = folderOpenersProvider?() ?? []
-        // 消歧标题必须对全量算：两个同名夹子一个在平铺、一个在「更多」时，
-        // 各算各的就都不带父目录，重名照样分不清。
+        // Disambiguate titles across the full collection.
         let titles = FavoriteFolderStore.displayTitles(folders)
         let limit = max(1, inlineFolderLimitProvider?() ?? Self.kInlineFolderLimit)
 
@@ -548,9 +485,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         let overflowFolders = folders.dropFirst(limit)
         if !overflowFolders.isEmpty {
-            // 数量用 badge。试过并进标题（「更多 · 4 个」），用户裁定不如
-            // badge 好看（2026-09-02），改回来，别再翻烙饼
-            let more = NSMenuItem(title: L10n.t("更多", "More"), action: nil, keyEquivalent: "")
+            let more = NSMenuItem(title: L10n.t("More"), action: nil, keyEquivalent: "")
             more.icon = Self.symbol("ellipsis.circle")
             more.badge = NSMenuItemBadge(count: overflowFolders.count)
             let submenu = NSMenu()
@@ -566,11 +501,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// 一条收藏的菜单行 —— 平铺区和「更多」共用同一副面孔。
+    /// Single favorite folder menu item.
     private func folderMenuItem(_ folder: FavoriteFolder, title: String,
                                 openers: [OpenerApp]) -> NSMenuItem {
         let exists = FileManager.default.fileExists(atPath: folder.path)
-        let item = NSMenuItem(title: exists ? title : title + L10n.t("（不存在）", " (missing)"),
+        let item = NSMenuItem(title: exists ? title : title + L10n.t(" (missing)"),
                               action: nil, keyEquivalent: "")
         item.toolTip = folder.path
         item.icon = exists
@@ -578,7 +513,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             : Self.symbol("questionmark.folder")
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        // 目录已经不存在时打开方式全部免谈，只留拷贝路径和取消收藏
+        // If missing on disk, only allow copy path and remove from favorites.
         fillFolderMenu(submenu, folder: folder, openers: exists ? openers : [])
         item.submenu = submenu
         item.isEnabled = true
@@ -588,7 +523,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func fillFolderMenu(_ menu: NSMenu, folder: FavoriteFolder,
                                 openers: [OpenerApp]) {
         if !openers.isEmpty {
-            menu.addItem(.sectionHeader(title: L10n.t("打开方式", "Open With")))
+            menu.addItem(.sectionHeader(title: L10n.t("Open With")))
             for opener in openers {
                 let item = NSMenuItem(title: opener.name,
                                       action: #selector(openFolder(_:)), keyEquivalent: "")
@@ -600,14 +535,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
         }
 
-        let copy = NSMenuItem(title: L10n.t("拷贝路径", "Copy Path"),
+        let copy = NSMenuItem(title: L10n.t("Copy Path"),
                               action: #selector(copyFolderPath(_:)), keyEquivalent: "")
         copy.target = self
         copy.representedObject = folder.path
         copy.icon = Self.symbol("doc.on.doc")
         menu.addItem(copy)
 
-        let remove = NSMenuItem(title: L10n.t("取消收藏", "Remove from Favorites"),
+        let remove = NSMenuItem(title: L10n.t("Remove from Favorites"),
                                 action: #selector(removeFolder(_:)), keyEquivalent: "")
         remove.target = self
         remove.representedObject = folder.path
@@ -615,7 +550,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(remove)
     }
 
-    /// 文件 / App 图标缩到菜单标准的 16pt。
+    /// Resizes icon to standard 16pt.
     private static func menuIcon(_ icon: NSImage) -> NSImage {
         guard let copy = icon.copy() as? NSImage else { return icon }
         copy.size = NSSize(width: 16, height: 16)
@@ -626,23 +561,19 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         onAddFinderFolder?()
     }
 
-    /// 「添加文件夹…」：目录选择面板。accessory app 不激活的话面板会沉到
-    /// 别的窗口后面（同弹 alert 的做法）。
+    /// "Add Folder…": Open folder selection panel.
     @objc private func pickFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = L10n.t("选择要收藏的文件夹", "Choose a folder to add to favorites")
-        panel.prompt = L10n.t("收藏", "Add")
+        panel.message = L10n.t("Choose a folder to add to favorites")
+        panel.prompt = L10n.t("Add")
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard onAddFolder?(url.path) == true else { return }
-        // 收藏成功就把菜单弹出来：新收藏的那条已经在列表最前，用户点它
-        // 就能立刻打开（2026-09-04 用户要求）。要等面板真正收起再弹 ——
-        // performClick 会同步进入菜单跟踪循环，直接在这里调会卡住
-        // 面板的关闭动画。
+        // Re-open status menu after adding.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.statusItem.button?.performClick(nil)
         }
@@ -655,19 +586,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let folder = URL(fileURLWithPath: path, isDirectory: true)
         let appName = opener.name
         let folderName = folder.lastPathComponent
-        // toast 等真打开了再报：冷启动的 App 要一两秒，提前说「已打开」是撒谎
         let report: (Error?) -> Void = { error in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     if let error {
                         log("⚠️  open folder failed: \(error.localizedDescription)")
-                        // 错误描述往往一长句，塞进标题只会被掐成一截 ——
-                        // 让它走副标题那行，标题只说成没成
-                        Toast.show(L10n.t("打开失败", "Failed to open"),
+                        Toast.show(L10n.t("Failed to open"),
                                    detail: error.localizedDescription, kind: .failure)
                     } else {
-                        Toast.show(L10n.t("已在 \(appName) 打开「\(folderName)」",
-                                          "Opened “\(folderName)” in \(appName)"),
+                        Toast.show(L10n.t("Opened “\(folderName)” in \(appName)"),
                                    detail: path)
                     }
                 }
@@ -696,7 +623,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         guard let path = sender.representedObject as? String else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(path, forType: .string)
-        Toast.show(L10n.t("已拷贝路径", "Path copied"), detail: path)
+        Toast.show(L10n.t("Path copied"), detail: path)
     }
 
     @objc private func removeFolder(_ sender: NSMenuItem) {
@@ -723,22 +650,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         onClearClosedTabs?(browser)
     }
 
-    // MARK: - 图标
+    // MARK: - Icons
 
-    /// 菜单栏图标：竖向卡片堆叠——前卡直立实心、后卡空心描边斜出右上。
-    /// 实心/空心的层次让前卡有分量，9° 的倾斜保留「切换/翻动」的动感
-    /// （平行偏移就成了普通「拷贝」图标，也和 PasteMemo 的构图撞车）。
-    /// 前卡周围用 destinationOut 抠一圈缝，让后卡的线不贴着前卡
-    /// （SF Symbols 的叠卡图标都是这个做法）。模板图，自动跟随菜单栏
-    /// 明暗反色。
+    /// Menu bar icon: stacked cards with front solid card and back outlined tilted card.
     private static let cardIcon: NSImage = {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { rect in
             let w: CGFloat = 9.5, h: CGFloat = 12, r: CGFloat = 2.25, stroke: CGFloat = 1.2
 
-            // 先在原点附近摆好几何，最后按墨迹包围盒整体平移居中
             let front = NSRect(x: 0, y: 0, width: w, height: h)
 
-            // 后卡：同尺寸，中心偏右上，绕自身中心倾斜 9°
+            // Back card: same size, rotated -9 degrees.
             let backCenter = NSPoint(x: front.midX + 3.2, y: front.midY - 3.2)
             let t = NSAffineTransform()
             t.translateX(by: backCenter.x, yBy: backCenter.y)
@@ -750,11 +671,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             back.transform(using: t as AffineTransform)
             back.lineWidth = stroke
 
-            // 墨迹 = 前卡填充 ∪ 后卡描边外缘。算出包围盒后平移到画布正中 ——
-            // 手调 origin 每改一次参数就偏一次（上一版就是这么偏上的），
-            // 程序化居中一劳永逸。平移量不取整：后卡斜 9° 本来就全程抗锯齿，
-            // 前卡是填充不是描边，亚像素平移对清晰度没有实际影响，
-            // 取整反而留下最多 1/4pt 的偏心。
+            // Center ink within icon bounds.
             let ink = front.union(back.bounds.insetBy(dx: -stroke / 2, dy: -stroke / 2))
             NSGraphicsContext.current?.cgContext.translateBy(x: rect.midX - ink.midX,
                                                              y: rect.midY - ink.midY)
@@ -762,7 +679,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             NSColor.black.setStroke()
             back.stroke()
 
-            // 前卡周围抠缝
+            // Cut out boundary around front card.
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current?.compositingOperation = .destinationOut
             NSColor.black.setFill()
@@ -770,7 +687,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                          xRadius: r + 1.3, yRadius: r + 1.3).fill()
             NSGraphicsContext.restoreGraphicsState()
 
-            // 前卡实心
+            // Front card fill.
             NSColor.black.setFill()
             NSBezierPath(roundedRect: front, xRadius: r, yRadius: r).fill()
             return true
@@ -780,7 +697,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return image
     }()
 
-    // MARK: - 动作
+    // MARK: - Actions
 
     @objc private func requestAuthorization() {
         onRequestAuthorization?()
@@ -804,10 +721,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 }
 
 extension NSMenuItem {
-    /// 菜单项图标的唯一入口。macOS 27 起，链接到 26+ SDK 的 app 由 AppKit
-    /// 决定图标显不显示，**默认全部藏掉**（含 favicon、App 图标这类非 symbol
-    /// 图，本机实测）。本项目菜单的约定是「图标要么全有要么全无」，所以每个
-    /// 设了图的项都显式要求显示。直接写 `.image =` 会在 27 上静默没图。
+    /// Standardized menu item icon visibility helper.
     var icon: NSImage? {
         get { image }
         set {

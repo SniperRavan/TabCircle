@@ -1,17 +1,16 @@
 <!DOCTYPE html>
-<html lang="zh">
+
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TabCircle — Arc 式标签切换器 for Chrome</title>
-<meta name="description" content="增强 Chrome 标签体验：按最近使用顺序切换标签、标签管理、置顶常驻，带网页缩略图切换器。macOS 开源工具。">
-<link rel="icon" href="logo.svg" type="image/svg+xml">
-
-<meta property="og:title" content="TabCircle — Arc-style tab switcher for Chrome">
-<meta property="og:description" content="Enhance Chrome's tab experience: MRU tab switching, tab management, and persistent pins.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://www.sniperravan.com/TabCircle/">
-
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>TabCircle — Arc-style tab switcher for Chrome</title>
+<meta content="Enhance Chrome tab experience: MRU tab switching, tab management, and persistent pins with live thumbnails." name="description"/>
+<link href="icon-128.png" rel="icon" type="image/png"/>
+<meta content="TabCircle — Arc-style tab switcher for Chrome" property="og:title"/>
+<meta content="Enhance Chrome's tab experience: MRU tab switching, tab management, and persistent pins." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://www.sniperravan.com/TabCircle/" property="og:url"/>
 <style>
   :root {
     --bg: #FFFFFF;
@@ -66,7 +65,7 @@
 
   .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
 
-  /* ── 顶栏 ─────────────────────────────────────────── */
+  /* ── Top Bar ─────────────────────────────────────────── */
   header {
     position: sticky; top: 0; z-index: 20;
     backdrop-filter: saturate(180%) blur(20px);
@@ -86,7 +85,7 @@
     padding: 6px 10px; border-radius: 7px;
   }
   .header-link:hover { color: var(--text-heading); background: var(--bg-alt); }
-  /* 赞助是唯一一个「请求读者做点什么」的入口，给点颜色和其余导航区分开 */
+  /* Sponsor link styling */
   .header-link.sponsor { color: #E0245E; }
   .header-link.sponsor:hover { color: #E0245E; background: rgba(224, 36, 94, 0.10); }
 
@@ -127,7 +126,7 @@
   .btn-secondary { background: var(--bg-alt); color: var(--text-heading); border: 1px solid var(--border-strong); }
   .btn-secondary:hover { border-color: var(--text-muted); }
 
-  /* ── 演示视频 ────────────────────────────────────── */
+  /* ── Demo Video ────────────────────────────────────── */
   .demo { padding: 8px 0 20px; }
   .demo video {
     width: 100%; display: block; border-radius: 14px;
@@ -140,7 +139,7 @@
     font-size: 13.5px; color: var(--text-muted);
   }
 
-  /* ── 通用区块 ────────────────────────────────────── */
+  /* ── Common Sections ───────────────────────────────── */
   section.block { padding: 56px 0; }
   section.block.alt { background: var(--bg-alt); border-block: 1px solid var(--border); }
   h2 {
@@ -170,7 +169,7 @@
     white-space: nowrap;
   }
 
-  /* ── 原理 ────────────────────────────────────────── */
+  /* ── How It Works ──────────────────────────────────── */
   pre.diagram {
     margin: 0 0 20px; padding: 20px; overflow-x: auto;
     background: var(--card-bg); border: 1px solid var(--border); border-radius: 13px;
@@ -185,7 +184,7 @@
   }
   .why strong { color: var(--text-heading); }
 
-  /* ── 安装步骤 ────────────────────────────────────── */
+  /* ── Installation ──────────────────────────────────── */
   ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; }
   ol.steps > li {
     counter-increment: s; position: relative;
@@ -219,13 +218,13 @@
     background: var(--accent-soft); font-size: 13.5px; color: var(--text);
   }
 
-  /* ── 表格 ────────────────────────────────────────── */
+  /* ── Table ─────────────────────────────────────────── */
   table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
   th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--border); }
   th { color: var(--text-muted); font-weight: 500; font-size: 13px; }
   td.keys { white-space: nowrap; }
 
-  /* ── 页脚 ────────────────────────────────────────── */
+  /* ── Footer ────────────────────────────────────────── */
   footer {
     padding: 40px 0 56px; text-align: center;
     color: var(--text-muted); font-size: 13.5px;
@@ -246,277 +245,202 @@
 </style>
 </head>
 <body>
-
 <header>
-  <div class="header-inner">
-    <a class="brand" href="#top">
-      <img src="logo.svg" alt="TabCircle">
-      <span>TabCircle</span>
-    </a>
-    <div class="spacer"></div>
-    <a class="header-link" href="#features" data-zh="功能" data-en="Features">功能</a>
-    <a class="header-link" href="#install" data-zh="安装" data-en="Install">安装</a>
-    <a class="header-link" href="https://github.com/sniperravan/TabCircle" target="_blank" rel="noreferrer">GitHub</a>
-    <a class="header-link sponsor" href="https://www.sniperravan.com/sponsor/" target="_blank" rel="noreferrer" data-zh="赞助" data-en="Sponsor">赞助</a>
-    <button id="langToggle" type="button">EN</button>
-  </div>
-</header>
-
-<div class="wrap" id="top">
-
-  <div class="hero">
-    <img class="icon" src="logo.svg" alt="TabCircle">
-    <h1 data-zh="增强 Chrome 的标签体验"
-        data-en="Supercharge Chrome's tabs">增强 Chrome 的标签体验</h1>
-    <p class="sub"
-       data-zh="Chrome 的 ⌃⇥ 按标签栏顺序走。TabCircle 让它按你实际使用的顺序走，带网页缩略图切换器；还能自动清理闲置标签、让置顶跨重启常驻。"
-       data-en="Chrome cycles tabs in tab-strip order. TabCircle makes ⌃⇥ cycle them by recent use with a thumbnail switcher — plus idle-tab cleanup and pins that survive restarts.">Chrome 的 ⌃⇥ 按标签栏顺序走。TabCircle 让它按你实际使用的顺序走，带网页缩略图切换器；还能自动清理闲置标签、让置顶跨重启常驻。</p>
-
-    <div class="badges">
-      <span class="badge">macOS 14+</span>
-      <span class="badge">Chrome 116+</span>
-      <span class="badge" data-zh="开源 · MIT" data-en="Open Source · MIT">开源 · MIT</span>
-      <span class="badge" data-zh="免费" data-en="Free">免费</span>
-    </div>
-
-    <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest" target="_blank" rel="noreferrer" data-zh="免费下载" data-en="Download">免费下载</a>
-      <a class="btn btn-secondary" href="#install" data-zh="安装指南" data-en="Install Guide">安装指南</a>
-    </div>
-  </div>
-
-  <div class="demo">
-    <video src="demo.mp4" poster="demo-poster.jpg" autoplay loop muted playsinline controls></video>
-    <p class="caption"
-       data-zh="按住 ⌃ 连点 ⇥ 浏览候选，松开即切换；也可以直接点卡片。"
-       data-en="Hold ⌃ and tap ⇥ to browse, release to switch — or just click a card.">按住 ⌃ 连点 ⇥ 浏览候选，松开即切换；也可以直接点卡片。</p>
-  </div>
+<div class="header-inner">
+<a class="brand" href="#top">
+<img alt="TabCircle" src="icon-128.png"/>
+<span>TabCircle</span>
+</a>
+<div class="spacer"></div>
+<a class="header-link" href="#features">Features</a>
+<a class="header-link" href="#install">Install</a>
+<a class="header-link" href="https://github.com/sniperravan/TabCircle" rel="noreferrer" target="_blank">GitHub</a>
+<a class="header-link sponsor" href="https://www.sniperravan.com/sponsor/" rel="noreferrer" target="_blank">Sponsor</a>
 
 </div>
-
+</header>
+<div class="wrap" id="top">
+<div class="hero">
+<img alt="TabCircle" class="icon" src="icon-128.png"/>
+<h1>Supercharge Chrome's tabs</h1>
+<p class="sub">Chrome cycles tabs in tab-strip order. TabCircle makes ⌃⇥ cycle them by recent use with a thumbnail switcher — plus idle-tab cleanup and pins that survive restarts.</p>
+<div class="badges">
+<span class="badge">macOS 14+</span>
+<span class="badge">Chrome 116+</span>
+<span class="badge">Open Source · MIT</span>
+<span class="badge">Free</span>
+</div>
+<div class="cta">
+<a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest" rel="noreferrer" target="_blank">Download</a>
+<a class="btn btn-secondary" href="#install">Install Guide</a>
+</div>
+</div>
+<div class="demo">
+<video autoplay="" controls="" loop="" muted="" playsinline="" poster="demo-poster.jpg" src="demo.mp4"></video>
+<p class="caption">Hold ⌃ and tap ⇥ to browse, release to switch — or just click a card.</p>
+</div>
+</div>
 <section class="block alt" id="features">
-  <div class="wrap">
-    <h2 data-zh="功能" data-en="Features">功能</h2>
-    <p class="lead" data-zh="从切换到管理，每一件都做到位。"
-       data-en="From switching to managing — each piece done properly.">从切换到管理，每一件都做到位。</p>
-
-    <div class="grid">
-      <div class="card">
-        <h3 data-zh="最近使用顺序" data-en="Most-recently-used order">最近使用顺序</h3>
-        <p data-zh="⌃⇥ 切到你上一个待过的标签，而不是标签栏里挨着的那个。"
-           data-en="⌃⇥ takes you to the tab you were last on, not the one next to it in the strip.">⌃⇥ 切到你上一个待过的标签，而不是标签栏里挨着的那个。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="来回切换稳定" data-en="Stable A↔B toggling">来回切换稳定</h3>
-        <p data-zh="再点一次就回到出发的标签。按住时只移动游标，松开才提交，中途经过的标签不会被记成用过。"
-           data-en="Tap again and you are back. While held, only a cursor moves and the switch commits on release, so tabs you merely passed are not recorded as used.">再点一次就回到出发的标签。按住时只移动游标，松开才提交，中途经过的标签不会被记成用过。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="网页缩略图" data-en="Page thumbnails">网页缩略图</h3>
-        <p data-zh="每张卡片都是网页实时画面，靠样子认标签，不用读被截断的标题。"
-           data-en="Every card carries a live screenshot, so you recognise tabs by what they look like.">每张卡片都是网页实时画面，靠样子认标签，不用读被截断的标题。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="键盘 · 方向键 · 鼠标" data-en="Keyboard, arrows, mouse">键盘 · 方向键 · 鼠标</h3>
-        <p data-zh="⌃⇥ 与 ⌃⇧⇥ 前后移动，按住时也能用方向键，或者直接点击任意卡片。"
-           data-en="⌃⇥ and ⌃⇧⇥ move back and forth, arrow keys work while held, or click any card directly.">⌃⇥ 与 ⌃⇧⇥ 前后移动，按住时也能用方向键，或者直接点击任意卡片。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="按窗口隔离" data-en="Scoped per window">按窗口隔离</h3>
-        <p data-zh="切换器只列出你正在用的那个窗口的标签，每个窗口保留各自的历史。可在设置中关闭。"
-           data-en="The switcher lists only the tabs of the window in use, and each window keeps its own history. Can be turned off in settings.">切换器只列出你正在用的那个窗口的标签，每个窗口保留各自的历史。可在设置中关闭。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="置顶常驻" data-en="Pins that persist">置顶常驻</h3>
-        <p data-zh="置顶的标签由 TabCircle 记住并与 Chrome 双向同步：重启浏览器自动恢复置顶，并带回最后访问的页面。"
-           data-en="Pinned tabs are remembered and kept in two-way sync: after a Chrome restart they come back pinned, restored to the last page you visited.">置顶的标签由 TabCircle 记住并与 Chrome 双向同步：重启浏览器自动恢复置顶，并带回最后访问的页面。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="菜单栏标签列表" data-en="Menu bar tab list">菜单栏标签列表</h3>
-        <p data-zh="状态栏一键展开所有窗口的标签：按窗口分组、显示最近使用时间，点击直接把 Chrome 带到前台并切过去。"
-           data-en="Every tab across every window, one hover away in the menu bar — grouped by window with last-used times; click to bring Chrome forward on that tab.">状态栏一键展开所有窗口的标签：按窗口分组、显示最近使用时间，点击直接把 Chrome 带到前台并切过去。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="边切边关" data-en="Close while switching">边切边关</h3>
-        <p data-zh="切换器卡片上悬停出现 ✕，顺手关掉不要的标签，本轮切换不中断。默认关闭，可在设置开启。"
-           data-en="Hover a switcher card for an ✕ and close tabs as you cycle, without breaking the round. Off by default, enable in settings.">切换器卡片上悬停出现 ✕，顺手关掉不要的标签，本轮切换不中断。默认关闭，可在设置开启。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="标签存活时间" data-en="Tab lifetime">标签存活时间</h3>
-        <p data-zh="12 小时 / 24 小时 / 7 天，超时未使用的标签自动清理；置顶、发声、标签组内和当前标签永不误伤。默认关闭。"
-           data-en="12 hours, 24 hours or 7 days — idle tabs get cleaned up automatically; pinned, audible, grouped and current tabs are never touched. Off by default.">12 小时 / 24 小时 / 7 天，超时未使用的标签自动清理；置顶、发声、标签组内和当前标签永不误伤。默认关闭。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="自定义快捷键" data-en="Custom shortcuts">自定义快捷键</h3>
-        <p data-zh="给「置顶 / 取消置顶当前标签」录制一个快捷键，只在 Chrome 前台生效，其他应用完全不受影响。"
-           data-en="Record a shortcut for pin / unpin current tab. It only fires while Chrome is frontmost — other apps never see it.">给「置顶 / 取消置顶当前标签」录制一个快捷键，只在 Chrome 前台生效，其他应用完全不受影响。</p>
-      </div>
-      <div class="card">
-        <h3 data-zh="不会静默失灵" data-en="Never silently broken">不会静默失灵</h3>
-        <p data-zh="任一环节不可用时，⌃⇥ 会放行给 Chrome 自带的切换，而不是变成没反应的按键。"
-           data-en="If either half is unavailable, ⌃⇥ falls through to Chrome's built-in switching instead of becoming a dead key.">任一环节不可用时，⌃⇥ 会放行给 Chrome 自带的切换，而不是变成没反应的按键。</p>
-      </div>
-    </div>
-  </div>
+<div class="wrap">
+<h2>Features</h2>
+<p class="lead">From switching to managing — each piece done properly.</p>
+<div class="grid">
+<div class="card">
+<h3>Most-recently-used order</h3>
+<p>⌃⇥ takes you to the tab you were last on, not the one next to it in the strip.</p>
+</div>
+<div class="card">
+<h3>Stable A↔B toggling</h3>
+<p>Tap again and you are back. While held, only a cursor moves and the switch commits on release, so tabs you merely passed are not recorded as used.</p>
+</div>
+<div class="card">
+<h3>Page thumbnails</h3>
+<p>Every card carries a live screenshot, so you recognise tabs by what they look like.</p>
+</div>
+<div class="card">
+<h3>Keyboard, arrows, mouse</h3>
+<p>⌃⇥ and ⌃⇧⇥ move back and forth, arrow keys work while held, or click any card directly.</p>
+</div>
+<div class="card">
+<h3>Scoped per window</h3>
+<p>The switcher lists only the tabs of the window in use, and each window keeps its own history. Can be turned off in settings.</p>
+</div>
+<div class="card">
+<h3>Pins that persist</h3>
+<p>Pinned tabs are remembered and kept in two-way sync: after a Chrome restart they come back pinned, restored to the last page you visited.</p>
+</div>
+<div class="card">
+<h3>Menu bar tab list</h3>
+<p>Every tab across every window, one hover away in the menu bar — grouped by window with last-used times; click to bring Chrome forward on that tab.</p>
+</div>
+<div class="card">
+<h3>Close while switching</h3>
+<p>Hover a switcher card for an ✕ and close tabs as you cycle, without breaking the round. Off by default, enable in settings.</p>
+</div>
+<div class="card">
+<h3>Tab lifetime</h3>
+<p>12 hours, 24 hours or 7 days — idle tabs get cleaned up automatically; pinned, audible, grouped and current tabs are never touched. Off by default.</p>
+</div>
+<div class="card">
+<h3>Custom shortcuts</h3>
+<p>Record a shortcut for pin / unpin current tab. It only fires while Chrome is frontmost — other apps never see it.</p>
+</div>
+<div class="card">
+<h3>Never silently broken</h3>
+<p>If either half is unavailable, ⌃⇥ falls through to Chrome's built-in switching instead of becoming a dead key.</p>
+</div>
+</div>
+</div>
 </section>
-
 <section class="block">
-  <div class="wrap">
-    <h2 data-zh="工作原理" data-en="How it works">工作原理</h2>
-    <p class="lead"
-       data-zh="TabCircle 由两部分组成，通过本地回环 WebSocket 通信。"
-       data-en="TabCircle runs as two parts that talk over a loopback WebSocket.">TabCircle 由两部分组成，通过本地回环 WebSocket 通信。</p>
-
+<div class="wrap">
+<h2>How it works</h2>
+<p class="lead">TabCircle runs as two parts that talk over a loopback WebSocket.</p>
 <pre class="diagram">┌─────────────────────────┐         ┌──────────────────────────┐
-│  Chrome Extension (MV3) │  ws://  │  Swift Helper            │
-│                         │◄───────►│                          │
+│  Chrome Extension (MV3) │  loop   │  Swift Helper            │
+│                         │◄──ws───►│                          │
 │  · tabs.onActivated     │  :41573 │  · CGEventTap  (⌃⇥)      │
 │  · captureVisibleTab    │         │  · NSPanel     (overlay) │
 │  · tabs.update          │         │  · MRU state machine     │
 └─────────────────────────┘         └──────────────────────────┘</pre>
-
-    <div class="why">
-      <div>
-        <strong data-zh="扩展读不到键盘。" data-en="The extension cannot read the keyboard.">扩展读不到键盘。</strong>
-        <span data-zh="Tab 键在 Chrome 33 时就被移出了 chrome.commands 的可用键列表，任何扩展都无法绑定 ⌃⇥ —— 这是必须有一个原生进程的原因。"
-              data-en="Tab was removed from the supported-key list of chrome.commands back in Chrome 33, so no extension can bind ⌃⇥. That is why a native process is required.">Tab 键在 Chrome 33 时就被移出了 chrome.commands 的可用键列表，任何扩展都无法绑定 ⌃⇥ —— 这是必须有一个原生进程的原因。</span>
-      </div>
-      <div>
-        <strong data-zh="原生进程读不到标签。" data-en="The helper cannot read the tabs.">原生进程读不到标签。</strong>
-        <span data-zh="标题、使用顺序、缩略图和执行切换都要通过 chrome.tabs API —— 这是必须有一个扩展的原因。"
-              data-en="Titles, ordering, thumbnails and switching all go through the chrome.tabs API. That is why an extension is required.">标题、使用顺序、缩略图和执行切换都要通过 chrome.tabs API —— 这是必须有一个扩展的原因。</span>
-      </div>
-    </div>
-  </div>
+<div class="why">
+<div>
+<strong>The extension cannot read the keyboard.</strong>
+<span>Tab was removed from the supported-key list of chrome.commands back in Chrome 33, so no extension can bind ⌃⇥. That is why a native process is required.</span>
+</div>
+<div>
+<strong>The helper cannot read the tabs.</strong>
+<span>Titles, ordering, thumbnails and switching all go through the chrome.tabs API. That is why an extension is required.</span>
+</div>
+</div>
+</div>
 </section>
-
 <section class="block alt" id="install">
-  <div class="wrap">
-    <h2 data-zh="安装" data-en="Installation">安装</h2>
-    <p class="lead"
-       data-zh="需要 macOS 14+ 和 Chrome 116+。"
-       data-en="Requires macOS 14+ and Chrome 116+.">需要 macOS 14+ 和 Chrome 116+。</p>
-
-    <ol class="steps">
-      <li>
-        <h3 data-zh="下载安装" data-en="Download and install">下载安装</h3>
-        <p data-zh="从 Releases 下载 DMG，把 TabCircle.app 拖进「应用程序」。首次打开如提示「无法验证开发者」，在「应用程序」里右键 TabCircle →「打开」即可 —— 应用没有付费开发者签名，DMG 内的说明文件有详细步骤。也可以按仓库 README 从源码编译。"
-           data-en="Download the DMG from Releases and drag TabCircle.app into Applications. If the first launch says the developer cannot be verified, right-click TabCircle in Applications and choose Open — the app carries no paid Apple signature; the read-me inside the DMG covers the details. Building from source is documented in the repository README.">从 Releases 下载 DMG，把 TabCircle.app 拖进「应用程序」。首次打开如提示「无法验证开发者」，在「应用程序」里右键 TabCircle →「打开」即可 —— 应用没有付费开发者签名，DMG 内的说明文件有详细步骤。也可以按仓库 README 从源码编译。</p>
-        <a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest" target="_blank" rel="noreferrer" data-zh="下载 App" data-en="Download the App">下载 App</a>
-      </li>
-      <li>
-        <h3 data-zh="安装扩展" data-en="Install the extension">安装扩展</h3>
-        <p data-zh="下载扩展包并解压，打开 chrome://extensions，右上角开启开发者模式，点「加载已解压的扩展程序」选择解压出的文件夹。扩展未上架商店，需要这一步开发者模式安装 —— 详细图文见安装说明。"
-           data-en="Download and unzip the extension, open chrome://extensions, turn on Developer mode, click Load unpacked and pick the unzipped folder. The extension isn't on the Web Store, so this developer-mode step is required — the guide walks through it.">下载扩展包并解压，打开 chrome://extensions，右上角开启开发者模式，点「加载已解压的扩展程序」选择解压出的文件夹。扩展未上架商店，需要这一步开发者模式安装 —— 详细图文见安装说明。</p>
-        <a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest/download/TabCircle-Extension.zip" rel="noreferrer" data-zh="下载扩展" data-en="Download Extension">下载扩展</a>
-        <a class="btn btn-secondary" href="install-extension.html" data-zh="扩展安装说明" data-en="Install Guide">扩展安装说明</a>
-      </li>
-      <li>
-        <h3 data-zh="授予辅助功能权限" data-en="Grant Accessibility permission">授予辅助功能权限</h3>
-        <p data-zh="首次启动会弹出引导浮层：把浮层里的 TabCircle 图标拖进「辅助功能」列表即完成授权，生效后应用自动重启。也可以手动前往 系统设置 → 隐私与安全性 → 辅助功能 打开开关。"
-           data-en="The first launch shows a guided overlay — drag the TabCircle icon from the overlay into the Accessibility list, and the app relaunches itself once the permission takes effect. You can also enable it manually under System Settings → Privacy &amp; Security → Accessibility.">首次启动会弹出引导浮层：把浮层里的 TabCircle 图标拖进「辅助功能」列表即完成授权，生效后应用自动重启。也可以手动前往 系统设置 → 隐私与安全性 → 辅助功能 打开开关。</p>
-      </li>
-      <li>
-        <h3 data-zh="开始使用" data-en="Start using it">开始使用</h3>
-        <p>
-          <span data-zh="菜单栏图标变亮、菜单第一行显示「已连接」，即表示两端已接上。点击 Chrome 工具栏的 TabCircle 图标可以打开设置。"
-                data-en="When the menu bar icon brightens and its first line reads Connected, both halves are talking. Click the TabCircle icon in the Chrome toolbar to open settings.">菜单栏图标变亮、菜单第一行显示「已连接」，即表示两端已接上。点击 Chrome 工具栏的 TabCircle 图标可以打开设置。</span>
-        </p>
-        <div class="note">
-          <span data-zh="日志文件在" data-en="The log file lives at">日志文件在</span>
-          <code class="inline">~/Library/Logs/TabCircle/tabcircle.log</code>
-          <span data-zh="，排查问题从这里开始。" data-en="— start troubleshooting there.">，排查问题从这里开始。</span>
-        </div>
-      </li>
-    </ol>
-  </div>
+<div class="wrap">
+<h2>Installation</h2>
+<p class="lead">Requires macOS 14+ and Chrome 116+.</p>
+<ol class="steps">
+<li>
+<h3>Download and install</h3>
+<p>Download the DMG from Releases and drag TabCircle.app into Applications. If the first launch says the developer cannot be verified, right-click TabCircle in Applications and choose Open — the app carries no paid Apple signature; the read-me inside the DMG covers the details. Building from source is documented in the repository README.</p>
+<a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest" rel="noreferrer" target="_blank">Download the App</a>
+</li>
+<li>
+<h3>Install the extension</h3>
+<p>Download and unzip the extension, open chrome://extensions, turn on Developer mode, click Load unpacked and pick the unzipped folder. The extension isn't on the Web Store, so this developer-mode step is required — the guide walks through it.</p>
+<a class="btn btn-primary" href="https://github.com/sniperravan/TabCircle/releases/latest/download/TabCircle-Extension.zip" rel="noreferrer">Download Extension</a>
+<a class="btn btn-secondary" href="install-extension.html">Install Guide</a>
+</li>
+<li>
+<h3>Grant Accessibility permission</h3>
+<p>The first launch shows a guided overlay — drag the TabCircle icon from the overlay into the Accessibility list, and the app relaunches itself once the permission takes effect. You can also enable it manually under System Settings → Privacy &amp; Security → Accessibility.</p>
+</li>
+<li>
+<h3>Start using it</h3>
+<p>
+<span>When the menu bar icon brightens and its first line reads Connected, both halves are talking. Click the TabCircle icon in the Chrome toolbar to open settings.</span>
+</p>
+<div class="note">
+<span>The log file lives at</span>
+<code class="inline">~/Library/Logs/TabCircle/tabcircle.log</code>
+<span>— start troubleshooting there.</span>
+</div>
+</li>
+</ol>
+</div>
 </section>
-
 <section class="block">
-  <div class="wrap">
-    <h2 data-zh="快捷键" data-en="Shortcuts">快捷键</h2>
-    <p class="lead" data-zh="Chrome 在前台时生效。" data-en="Active while Chrome is frontmost.">Chrome 在前台时生效。</p>
-    <table>
-      <thead>
-        <tr>
-          <th data-zh="按键" data-en="Keys">按键</th>
-          <th data-zh="效果" data-en="Result">效果</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="keys"><kbd>⌃</kbd> <kbd>⇥</kbd></td>
-          <td data-zh="切换到上一个使用的标签" data-en="Switch to the previously used tab">切换到上一个使用的标签</td>
-        </tr>
-        <tr>
-          <td class="keys"><kbd>⌃</kbd> <kbd>⇥</kbd> <kbd>⇥</kbd></td>
-          <td data-zh="按住 ⌃ 连点，沿使用历史继续往回走" data-en="Hold ⌃ and keep tapping to move further back">按住 ⌃ 连点，沿使用历史继续往回走</td>
-        </tr>
-        <tr>
-          <td class="keys"><kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>⇥</kbd></td>
-          <td data-zh="反向移动" data-en="Move in the opposite direction">反向移动</td>
-        </tr>
-        <tr>
-          <td class="keys"><kbd>⌃</kbd> <kbd>←</kbd> <kbd>→</kbd></td>
-          <td data-zh="按住 ⌃ 时用方向键移动游标" data-en="Move the cursor with arrow keys while ⌃ is held">按住 ⌃ 时用方向键移动游标</td>
-        </tr>
-        <tr>
-          <td class="keys" data-zh="⌃ + 点击" data-en="⌃ + click">⌃ + 点击</td>
-          <td data-zh="直接切到点中的那个标签" data-en="Switch straight to the card you click">直接切到点中的那个标签</td>
-        </tr>
-        <tr>
-          <td class="keys" data-zh="自定义" data-en="Custom">自定义</td>
-          <td data-zh="置顶 / 取消置顶当前标签（在 设置 → 快捷键 中录制）" data-en="Pin / unpin the current tab (record it under Settings → Shortcuts)">置顶 / 取消置顶当前标签（在 设置 → 快捷键 中录制）</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+<div class="wrap">
+<h2>Shortcuts</h2>
+<p class="lead">Active while Chrome is frontmost.</p>
+<table>
+<thead>
+<tr>
+<th>Keys</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="keys"><kbd>⌃</kbd> <kbd>⇥</kbd></td>
+<td>Switch to the previously used tab</td>
+</tr>
+<tr>
+<td class="keys"><kbd>⌃</kbd> <kbd>⇥</kbd> <kbd>⇥</kbd></td>
+<td>Hold ⌃ and keep tapping to move further back</td>
+</tr>
+<tr>
+<td class="keys"><kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>⇥</kbd></td>
+<td>Move in the opposite direction</td>
+</tr>
+<tr>
+<td class="keys"><kbd>⌃</kbd> <kbd>←</kbd> <kbd>→</kbd></td>
+<td>Move the cursor with arrow keys while ⌃ is held</td>
+</tr>
+<tr>
+<td class="keys">⌃ + click</td>
+<td>Switch straight to the card you click</td>
+</tr>
+<tr>
+<td class="keys">Custom</td>
+<td>Pin / unpin the current tab (record it under Settings → Shortcuts)</td>
+</tr>
+</tbody>
+</table>
+</div>
 </section>
-
 <footer>
-  <div class="wrap">
-    <div class="footer-links">
-      <a href="https://github.com/sniperravan/TabCircle" target="_blank" rel="noreferrer">GitHub</a>
-      <a href="https://github.com/sniperravan/TabCircle/blob/main/README_zh.md" target="_blank" rel="noreferrer" data-zh="文档" data-en="Docs">文档</a>
-      <a href="https://github.com/sniperravan/TabCircle/issues" target="_blank" rel="noreferrer" data-zh="反馈" data-en="Issues">反馈</a>
-      <a href="https://www.sniperravan.com/sponsor/" target="_blank" rel="noreferrer" data-zh="赞助" data-en="Sponsor">赞助</a>
-      <a href="https://www.sniperravan.com/" target="_blank" rel="noreferrer" data-zh="更多作品" data-en="More apps">更多作品</a>
-    </div>
-    <div>MIT License · © <a href="https://github.com/sniperravan" target="_blank" rel="noreferrer">sniperravan</a></div>
-  </div>
+<div class="wrap">
+<div class="footer-links">
+<a href="https://github.com/sniperravan/TabCircle" rel="noreferrer" target="_blank">GitHub</a>
+<a href="https://github.com/sniperravan/TabCircle/blob/main/README.md" rel="noreferrer" target="_blank">Docs</a>
+<a href="https://github.com/sniperravan/TabCircle/issues" rel="noreferrer" target="_blank">Issues</a>
+<a href="https://www.sniperravan.com/sponsor/" rel="noreferrer" target="_blank">Sponsor</a>
+<a href="https://www.sniperravan.com/" rel="noreferrer" target="_blank">More apps</a>
+</div>
+<div>MIT License · © <a href="https://github.com/sniperravan" rel="noreferrer" target="_blank">sniperravan</a></div>
+</div>
 </footer>
-
-<script>
-  // 双语切换。文案直接放在 data-zh / data-en 属性上，不额外维护字典 ——
-  // 内容和结构在一处，改文案不用两边对照。
-  // 需要混排 <strong> / <code> 的段落，拆成多个元素各自带属性，
-  // 这样赋值全部走 textContent，不碰 innerHTML。
-  const KEY = "tabcircle-lang";
-  const toggle = document.getElementById("langToggle");
-
-  function apply(lang) {
-    document.documentElement.lang = lang;
-    for (const el of document.querySelectorAll("[data-zh][data-en]")) {
-      const value = el.dataset[lang];
-      if (value !== undefined) el.textContent = value;
-    }
-    toggle.textContent = lang === "zh" ? "EN" : "中文";
-    document.title = lang === "zh"
-      ? "TabCircle — Arc 式标签切换器 for Chrome"
-      : "TabCircle — Arc-style tab switcher for Chrome";
-  }
-
-  let lang = localStorage.getItem(KEY)
-    || (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en");
-
-  apply(lang);
-
-  toggle.addEventListener("click", () => {
-    lang = lang === "zh" ? "en" : "zh";
-    localStorage.setItem(KEY, lang);
-    apply(lang);
-  });
-</script>
 
 </body>
 </html>

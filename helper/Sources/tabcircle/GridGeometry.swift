@@ -1,23 +1,21 @@
-/// 全局卡片布局的「视觉相邻」几何。
+/// Visual adjacency geometry for the global switcher grid layout.
 ///
-/// 抽成没有任何依赖的纯函数，是为了能单独编译验证（`helper/checks/`）：
-/// 全局卡片是**每个浏览器各自换行**的，每组最后一行都可能不满，扁平的
-/// `cursor ± cols` 会算到别的组里去。这类索引算术在边界上极易出错，而出错的
-/// 表现只是「按方向键跳到了奇怪的地方」—— 不崩溃、不报错、不写日志，
-/// 全靠人肉发现。
+/// Extracted as a pure function without dependencies for isolated verification (`helper/checks/`):
+/// Cards wrap within each browser group independently; the last row of each group may be incomplete,
+/// so naive `cursor ± cols` flat index calculations would jump unexpectedly across group boundaries.
 enum GridGeometry {
 
-    /// 视觉上正上方 / 正下方那一项的位置；已经在最顶行或最底行时返回 nil（不回绕）。
+    /// Position of the visually adjacent item directly above or below; returns nil at topmost/bottommost boundaries (no wrap-around).
     ///
-    /// 跨组是**有意**的：方向键走的是眼睛看到的相邻，跟标签属于哪个浏览器无关。
-    /// 在本组最后一行按 ↓ 会进入下一组的第一行、同列；该行不够宽就夹到行尾。
+    /// Cross-group transitions are intentional: arrow keys follow visual spatial layout regardless of browser ownership.
+    /// Pressing ↓ on the last row of a group moves to the same column in the first row of the next group (clamped if narrower).
     ///
     /// - Parameters:
-    ///   - cursor: 当前位置（扁平下标）。
-    ///   - groupStarts: 每个分组第一项的扁平下标，升序，首项为 0。
-    ///   - total: 项目总数。
-    ///   - cols: 每行列数。
-    ///   - up: true 向上、false 向下。
+    ///   - cursor: Current index (flat index).
+    ///   - groupStarts: Flat index of the first item in each group, sorted ascending, first item is 0.
+    ///   - total: Total number of items.
+    ///   - cols: Number of columns per row.
+    ///   - up: true for upward navigation, false for downward.
     static func rowNeighbor(of cursor: Int,
                             groupStarts: [Int],
                             total: Int,
@@ -34,10 +32,10 @@ enum GridGeometry {
 
         if up {
             if rowStart >= cols {
-                // 组内上一行。它不是本组最后一行，必然是满的，同列一定存在。
+                // Previous row within the same group; guaranteed full since it is not the last row
                 return groupStart + rowStart - cols + col
             }
-            // 本组第一行 → 上一组的最后一行
+            // First row of current group -> last row of previous group
             guard groupIndex > 0 else { return nil }
             let prevStart = groupStarts[groupIndex - 1]
             let prevCount = groupStart - prevStart
@@ -49,10 +47,10 @@ enum GridGeometry {
         let count = groupEnd - groupStart
         let nextRowStart = rowStart + cols
         if nextRowStart < count {
-            // 组内下一行，可能不满 —— 夹到该行最后一张
+            // Next row within same group, possibly incomplete — clamp to end of that row
             return groupStart + nextRowStart + min(col, min(cols, count - nextRowStart) - 1)
         }
-        // 本组最后一行 → 下一组的第一行
+        // Last row of current group -> first row of next group
         guard groupIndex + 1 < groupStarts.count else { return nil }
         let nextStart = groupStarts[groupIndex + 1]
         let nextEnd = groupIndex + 2 < groupStarts.count ? groupStarts[groupIndex + 2] : total

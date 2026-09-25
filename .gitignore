@@ -1,4 +1,4 @@
-# AI 助手相关文件，不进开源仓库
+# AI Assistant files
 CLAUDE.md
 AGENTS.md
 .claude/
@@ -7,21 +7,41 @@ AGENTS.md
 .aider*
 .github/copilot-instructions.md
 
-# Swift / SwiftPM
+# Project management docs
+docs/project_management/
+
+# Python / Linux Helper
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+*.egg-info/
+dist/
+venv/
+.venv/
+linux-helper/venv/
+test_*.py
+!tests/
+!tests/**
+
+# Swift / SwiftPM (macOS)
 helper/.build/
 helper/.swiftpm/
 *.xcodeproj
 *.xcworkspace
 .DS_Store
 
-# 运行时产物
+# Runtime logs
 *.log
+tabcircle.log
 tabflick.log
 
-# 打包产物
+# Build artifacts
 build/
-assets/TabFlick.icns
+release/
+assets/*.icns
 
-# 设计草稿(本地预览用,不进仓库)
+# Mockups / Design drafts
 mockups/
-linux-helper/venv

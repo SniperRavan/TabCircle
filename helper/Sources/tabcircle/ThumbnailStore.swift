@@ -2,23 +2,20 @@ import AppKit
 import CryptoKit
 import Foundation
 
-/// 网页缩略图的两级缓存：内存 + 磁盘。
+/// Two-level cache for web page thumbnails: memory + disk.
 ///
-/// 为什么必须持久化：`captureVisibleTab` 只能截「当前可见」的标签，后台标签
-/// 拿不到。所以图是用户正常浏览时一张张攒出来的 —— 只存内存的话，helper
-/// 一重启就全没了，切换器会退化成一排空卡片，得再把每个标签都点一遍才恢复。
+/// Persistent caching is necessary because `captureVisibleTab` can only capture currently visible tabs.
+/// Thumbnails accumulate gradually during active browsing; in-memory-only caching would wipe them out
+/// upon app restarts.
 ///
-/// 为什么按 URL 而不是 tabId 建索引：tabId 在浏览器重启后全部重新分配，
-/// 而 URL 是稳定的。按 URL 存还有个额外好处 —— 同一个页面换个标签重新打开，
-/// 缩略图立刻就在。
+/// Indexed by URL rather than tabId: tabIds change on browser restart, whereas URLs remain stable.
 @MainActor
 final class ThumbnailStore {
 
     private let directory: URL
     private var memory: [String: NSImage] = [:]
 
-    /// 磁盘上保留的最大张数。单张 400×250 的 JPEG 约 20–40 KB，
-    /// 500 张也就十几 MB，但没必要无限涨。
+    /// Maximum thumbnails retained on disk. A 400x250 JPEG is ~20-40 KB; 500 items is ~15 MB.
     private let maxEntries = 500
 
     init() {
@@ -28,7 +25,7 @@ final class ThumbnailStore {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
-    // MARK: - 读写
+    // MARK: - Read / Write
 
     func image(for url: String) -> NSImage? {
         let key = Self.key(for: url)
@@ -50,7 +47,7 @@ final class ThumbnailStore {
         try? data.write(to: file, options: .atomic)
     }
 
-    /// 启动时把已有的图读进内存，这样第一次按 ⌃⇥ 就有画面。
+    /// Pre-load existing thumbnails into memory on startup so first ⌃⇥ has previews immediately.
     func warmUp() {
         let files = (try? FileManager.default.contentsOfDirectory(
             at: directory,
@@ -68,7 +65,7 @@ final class ThumbnailStore {
         prune(files: files)
     }
 
-    /// 超出上限时删掉最久没更新的那些。
+    /// Prune oldest thumbnails when exceeding maximum cache entries.
     private func prune(files: [URL]) {
         guard files.count > maxEntries else { return }
         let sorted = files.sorted { a, b in
@@ -82,9 +79,9 @@ final class ThumbnailStore {
         }
     }
 
-    // MARK: - 键
+    // MARK: - Key Generation
 
-    /// URL 不能直接当文件名（长度、斜杠、大小写敏感性都有坑），取哈希。
+    /// Hash URLs using SHA256 prefix to generate safe, cross-platform filenames.
     private static func key(for url: String) -> String {
         let digest = SHA256.hash(data: Data(url.utf8))
         return digest.prefix(12).map { String(format: "%02x", $0) }.joined()

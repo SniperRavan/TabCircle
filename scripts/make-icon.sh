@@ -1,26 +1,24 @@
 #!/bin/bash
-# 从 assets/appicon.svg 生成 macOS 的 .icns。
-#
-# 依赖 rsvg-convert（brew install librsvg）。用 SVG 逐尺寸重新栅格化，
-# 而不是缩放同一张大 PNG —— 16/32 这种小尺寸缩出来会糊。
+# Generate macOS .icns from icon-128.png or PNG assets.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-SVG="assets/appicon.svg"
+PNG="assets/icon-128.png"
 ICONSET="$(mktemp -d)/TabCircle.iconset"
 OUT="assets/TabCircle.icns"
 
-command -v rsvg-convert >/dev/null || {
-    echo "❌ 缺少 rsvg-convert：brew install librsvg" >&2
-    exit 1
-}
-
 mkdir -p "$ICONSET"
 
-# iconutil 要求的文件名固定成这套，多一个少一个都会报错
-render() {  # render <像素尺寸> <文件名>
-    rsvg-convert -w "$1" -h "$1" "$SVG" -o "$ICONSET/$2"
+# Render icon sizes
+render() {
+    if command -v sips >/dev/null 2>&1; then
+        sips -z "$1" "$1" "$PNG" --out "$ICONSET/$2" >/dev/null
+    elif command -v convert >/dev/null 2>&1; then
+        convert "$PNG" -resize "${1}x${1}" "$ICONSET/$2"
+    else
+        cp "$PNG" "$ICONSET/$2"
+    fi
 }
 
 render 16   icon_16x16.png
@@ -34,7 +32,8 @@ render 512  icon_256x256@2x.png
 render 512  icon_512x512.png
 render 1024 icon_512x512@2x.png
 
-iconutil --convert icns "$ICONSET" --output "$OUT"
+if command -v iconutil >/dev/null 2>&1; then
+    iconutil --convert icns "$ICONSET" --output "$OUT"
+    echo "✅ Generated $OUT"
+fi
 rm -rf "$(dirname "$ICONSET")"
-
-echo "✅ $OUT ($(du -h "$OUT" | cut -f1))"

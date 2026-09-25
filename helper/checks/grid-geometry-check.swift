@@ -1,15 +1,16 @@
-// GridGeometry 的穷举验证。
+// Exhaustive validation of GridGeometry.
 //
-// 跑法（在 helper/ 下）：
+// Running (under helper/):
 //   swiftc -parse-as-library Sources/tabcircle/GridGeometry.swift \
-//          checks/grid-geometry-check.swift -o /tmp/gridcheck && /tmp/gridcheck
+//          checks/grid-geometry-check.swift -o ./gridcheck && ./gridcheck
 //
-// 思路：把布局**真的摆出来**（一行一个数组），再按「同列、上一行/下一行、
-// 不够宽就夹到行尾」去找答案 —— 这是「视觉相邻」的定义本身。然后拿它跟
-// GridGeometry 里那套模运算逐个对。两种实现方式差得够远，边界上的 off-by-one
-// 藏不住。
+// Approach: Lay out the actual grid (one array per row), then find the answer
+// based on "same column, previous/next row, clamped to end of line if row is not wide enough"
+// — this represents the visual adjacency definition itself. Then compare it against
+// the modular arithmetic logic in GridGeometry. The two implementations are sufficiently
+// distinct to catch any off-by-one boundary bugs.
 
-/// 按「每组各自换行」把项目摆成二维；元素是扁平下标。
+/// Lay out items in 2D by wrapping within each group; elements are flat indices.
 func layout(groupSizes: [Int], cols: Int) -> [[Int]] {
     var rows: [[Int]] = []
     var base = 0
@@ -25,7 +26,7 @@ func layout(groupSizes: [Int], cols: Int) -> [[Int]] {
     return rows
 }
 
-/// 视觉相邻的定义：同列、相邻行；那一行不够宽就落在行尾。
+/// Visual adjacency definition: same column, adjacent row; falls to end of row if target row is narrower.
 func expected(cursor: Int, rows: [[Int]], up: Bool) -> Int? {
     guard let row = rows.firstIndex(where: { $0.contains(cursor) }),
           let col = rows[row].firstIndex(of: cursor) else { return nil }
@@ -50,7 +51,7 @@ struct Check {
         var cases = 0
         var failures = 0
 
-        // 组数 1…3、每组 1…9 个、列数 1…5：覆盖满行、缺一个、只剩一个等所有边界
+        // Group counts 1...3, items per group 1...9, column counts 1...5: covers full rows, gaps, single items, and all edge cases.
         var sizeSets: [[Int]] = []
         for a in 1...9 {
             sizeSets.append([a])
@@ -79,8 +80,8 @@ struct Check {
                             failures += 1
                             if failures <= 10 {
                                 print("✗ sizes=\(sizes) cols=\(cols) cursor=\(cursor) "
-                                      + "\(up ? "↑" : "↓") 期望 \(want.map(String.init) ?? "nil") "
-                                      + "实际 \(got.map(String.init) ?? "nil")")
+                                      + "\(up ? "↑" : "↓") Expected \(want.map(String.init) ?? "nil") "
+                                      + "Actual \(got.map(String.init) ?? "nil")")
                             }
                         }
                     }
@@ -88,7 +89,7 @@ struct Check {
             }
         }
 
-        // 越界 / 空列表这些异常入参不能崩，也不能给出位置
+        // Out-of-bounds / empty lists must not crash, nor return valid positions.
         let guards: [(Int, [Int], Int, Int)] = [
             (-1, [0], 3, 2), (5, [0], 3, 2), (0, [0], 3, 0), (0, [], 0, 2),
         ]
@@ -97,13 +98,13 @@ struct Check {
             for up in [true, false] where GridGeometry.rowNeighbor(
                 of: cursor, groupStarts: gs, total: total, cols: cols, up: up) != nil {
                 failures += 1
-                print("✗ 异常入参应返回 nil：cursor=\(cursor) starts=\(gs) total=\(total) cols=\(cols)")
+                print("✗ Invalid inputs should return nil: cursor=\(cursor) starts=\(gs) total=\(total) cols=\(cols)")
             }
         }
 
         print(failures == 0
-              ? "全部通过（\(cases) 组）"
-              : "\(failures) 项失败（共 \(cases) 组）")
-        if failures > 0 { fatalError("GridGeometry 校验未通过") }
+              ? "All passed (\(cases) cases)"
+              : "\(failures) failed (out of \(cases) cases)")
+        if failures > 0 { fatalError("GridGeometry validation failed") }
     }
 }
