@@ -57,7 +57,7 @@ jobs:
       - name: Syntax check
         run: |
           for f in scripts/*.sh; do bash -n "$f"; done
-      - uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bf48f761362da # v2.0.0
+      - uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
           scandir: './scripts'
           severity: warning
