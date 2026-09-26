@@ -16,7 +16,9 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
 
       - name: Package Linux & Extension
         run: |
@@ -29,7 +31,7 @@ jobs:
           bash scripts/package-release.sh "$VERSION"
 
       - name: Upload Linux & Extension Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: linux-artifacts
           path: |
@@ -42,7 +44,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
@@ -69,7 +71,7 @@ jobs:
           bash scripts/build-app.sh "$VERSION"
 
       - name: Upload macOS DMGs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: macos-artifacts
           path: build/TabCircle-*.dmg
@@ -81,10 +83,12 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
 
       - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         with:
           path: release-assets
           merge-multiple: true
@@ -107,14 +111,20 @@ jobs:
 
       - name: Generate Release Notes
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "${GITHUB_REF_NAME:-}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 1.0.0)"
+          fi
           cat << EOF | sed 's/^[ ]\{10\}//' > release-notes.md
           ## What's New
 
-          - **Automated macOS DMG Packaging**: Built on \`macos-14\` (Apple Silicon) runners, providing native \`arm64\` and \`x86_64\` disk images.
-          - **Linux Helper Auto-Update**: Background update check against GitHub Releases (\`./scripts/install-linux.sh --check-updates\`) with \`notify-send\` desktop alerts.
-          - **Wayland Compatibility Detection**: Clear diagnostics and actionable guidance (\`--ozone-platform=x11\`) for browsers running under Wayland.
-          - **Unified 5-Asset Distribution**: Extension, Linux daemon, Apple Silicon DMG, Intel DMG, and unified SHA-256 checksums in every release.
+          - **Structural Browser Identity Detection**: Proves legitimate browser windows via active WebSocket connection ownership (PID correlation across child processes and ancestors) plus expanded coverage for 16+ Chromium forks (Chromium, Chrome, Brave, Edge, Vivaldi, Opera, Helium, Zen, Cent, Thorium, Cromite, and more).
+          - **Custom Browser Fork Support**: Unlisted Chromium forks can now be recognized without modifying code via \`"extra_browser_classes"\` in \`~/.config/tabcircle/config.json\`.
+          - **SSRF & DNS-Rebind Hardening**: Enhanced favicon validation with IP-level filtering and custom SNI pinning against loopback/private IP bypasses.
+          - **Multi-Monitor Display Resolution**: Multi-monitor screen targeting algorithm hardened and tested directly against real window coordinates and XRandR screens.
+          - **WebSocket Reconnect Backoff & Battery Optimization**: Exponential backoff reconnects on extension offscreen worker and reduced background idle polling.
+          - **Packaging & CI Improvements**: Linux release tarball unpacks into self-contained \`tabcircle-linux/\`, hardened GitHub Action SHA-pinning, and ensured clean Semgrep SAST compliance.
           - **Browser Extension Updated**: Manifest bumped to v${VERSION}. Reload unpacked from \`chrome://extensions\` after downloading.
 
           ### System Requirements
@@ -136,7 +146,7 @@ jobs:
           EOF
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c062e08bd532874e2482d80865e6f9863994b377 # v2.2.4
         with:
           body_path: release-notes.md
           files: |

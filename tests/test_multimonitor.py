@@ -1,60 +1,28 @@
 """
 Unit test for TabCircle Linux Multi-Monitor Screen Anchor Logic
-Validates screen resolution across single, dual, stacked, and fractional scaling setups.
+Validates screen resolution across single, dual, stacked, and fractional scaling setups
+directly against app.resolve_target_screen.
 """
+
+import sys
+import os
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "linux-helper"))
+
+from app import resolve_target_screen
 
 def resolve_screen(screens_mock, anchor=None, cursor_pos=(0, 0), primary_screen_name="primary"):
     """
-    Implements the exact resolution algorithm used by TabCircle's SwitcherOverlay.center_on_screen.
-    - screens_mock: list of dicts: {'name': str, 'geo': (x,y,w,h), 'dpr': float}
-    - anchor: dict {'center': (cx, cy), 'screen_name': str} or tuple (cx, cy)
+    Delegates to the actual production resolve_target_screen in app.py.
     """
-    c = None
-    s_name = None
-    if isinstance(anchor, dict):
-        c = anchor.get("center")
-        s_name = anchor.get("screen_name")
-    elif isinstance(anchor, (tuple, list)):
-        c = anchor
-
-    target_screen = None
-
-    # 1. Exact match by XRandR monitor output name
-    if s_name:
-        for s in screens_mock:
-            if s['name'] == s_name:
-                target_screen = s
-                break
-
-    # 2. Geometric match accounting for fractional DPR
-    if not target_screen and c:
-        cx, cy = c
-        for s in screens_mock:
-            dpr = s.get('dpr', 1.0)
-            gx, gy, gw, gh = s['geo']
-            phys_left = round(gx * dpr)
-            phys_top = round(gy * dpr)
-            phys_right = round((gx + gw) * dpr)
-            phys_bottom = round((gy + gh) * dpr)
-            if phys_left <= cx < phys_right and phys_top <= cy < phys_bottom:
-                target_screen = s
-                break
-
-    # 3. Fallback to cursor pos or primary
-    if not target_screen:
-        for s in screens_mock:
-            gx, gy, gw, gh = s['geo']
-            if gx <= cursor_pos[0] < gx + gw and gy <= cursor_pos[1] < gy + gh:
-                target_screen = s
-                break
-
-    if not target_screen:
-        for s in screens_mock:
-            if s['name'] == primary_screen_name:
-                target_screen = s
-                break
-
-    return target_screen['name'] if target_screen else None
+    target = resolve_target_screen(
+        anchor=anchor,
+        screens=screens_mock,
+        cursor_pos=cursor_pos,
+        primary_screen={'name': primary_screen_name, 'geo': (0, 0, 1920, 1080), 'dpr': 1.0}
+    )
+    return target['name'] if target else None
 
 
 def run_tests():

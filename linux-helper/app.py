@@ -18,6 +18,11 @@ import signal
 import math
 import tempfile
 import subprocess
+import re
+import socket
+import ipaddress
+import ssl
+import http.client
 from urllib.parse import urlparse
 
 from PyQt6.QtWidgets import (
@@ -137,12 +142,19 @@ def ensure_single_instance():
     atexit.register(cleanup_pid)
 
 
-# Path to icon relative to this file
+# Path to icon relative to this file (check packaged assets/ first, then repo extension/)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ICON_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "extension", "icons", "icon-128.png"))
+_candidate_icon = os.path.normpath(os.path.join(BASE_DIR, "..", "assets", "icon-128.png"))
+if not os.path.exists(_candidate_icon):
+    _candidate_icon = os.path.normpath(os.path.join(BASE_DIR, "..", "extension", "icons", "icon-128.png"))
+ICON_PATH = _candidate_icon
 
-# Supported browser window classes
-BROWSER_CLASSES = ['chromium', 'chrome', 'brave', 'edge', 'vivaldi', 'opera', 'zen']
+# Supported browser window classes (Layer 1 fallback list)
+BROWSER_CLASSES = [
+    'chromium', 'chrome', 'brave', 'edge', 'msedge', 'vivaldi', 'opera',
+    'yandex', 'slimjet', 'ungoogled-chromium', 'thorium', 'helium',
+    'cromite', 'avast', 'avg', 'centbrowser', 'zen'
+]
 
 # --- Global State ---
 ws_loop = None
@@ -198,16 +210,19 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 def load_helper_config():
     """
     Loads user configuration from ~/.config/tabcircle/config.json.
-    Supports low-resource mode via config or --low-resource CLI argument.
+    Supports low-resource mode and extra_browser_classes escape hatch.
     """
     config = {
-        "low_resource_mode": False
+        "low_resource_mode": False,
+        "extra_browser_classes": []
     }
     if os.path.isfile(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
+                    if "extra_browser_classes" in data and isinstance(data["extra_browser_classes"], list):
+                        config["extra_browser_classes"] = [str(c).lower() for c in data["extra_browser_classes"]]
                     if "low_resource_mode" in data:
                         config["low_resource_mode"] = bool(data["low_resource_mode"])
                     elif "lowResourceMode" in data:
@@ -326,8 +341,19 @@ def draw_globe_icon(size=13, color=None):
     p.end()
     return pix
 
+class SNIConnection(http.client.HTTPSConnection):
+    """HTTPSConnection that connects to an explicit resolved IP while preserving SNI and cert validation for hostname."""
+    def __init__(self, host, ip, port, timeout):
+        super().__init__(ip, port, timeout=timeout)
+        self.server_hostname = host
+
+    def connect(self):
+        super(http.client.HTTPSConnection, self).connect()
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=self.server_hostname)
+
+
 def get_favicon_pixmap(tab_data, size=13, globe_color=None):
-    """Returns cached favicon or fallback globe icon with strict SSRF and protocol validation. Converts to QPixmap on GUI thread."""
+    """Returns cached favicon or fallback globe icon with strict SSRF, DNS-rebinding, and protocol validation. Converts to QPixmap on GUI thread."""
     tab_id = tab_data.get("id")
     if tab_id in cached_favicons:
         return cached_favicons[tab_id]
@@ -364,39 +390,46 @@ def get_favicon_pixmap(tab_data, size=13, globe_color=None):
         # Security: strictly allow only public http/https schemes, block file://, localhost, private RFC1918 IPs
         if parsed.scheme in ('http', 'https') and parsed.hostname:
             hostname = parsed.hostname.lower()
-            if hostname not in ('localhost', '127.0.0.1', '::1', '0.0.0.0') and not hostname.startswith('192.168.') and not hostname.startswith('10.'):
-                fetching_favicons.add(tab_id)
-                def _fetch():
-                    conn = None
-                    try:
-                        import http.client
-                        port = parsed.port or (443 if parsed.scheme == 'https' else 80)
-                        path = parsed.path or '/'
-                        if parsed.query:
-                            path += '?' + parsed.query
-                        conn_cls = http.client.HTTPSConnection if parsed.scheme == 'https' else http.client.HTTPConnection
-                        conn = conn_cls(hostname, port, timeout=1.5)
-                        conn.request('GET', path, headers={'User-Agent': 'TabCircle/1.0'})
-                        resp = conn.getresponse()
-                        if resp.status == 200:
-                            data = resp.read(1024 * 1024 + 1)
-                            if len(data) <= 1024 * 1024:  # Max 1MB
-                                img = QImage.fromData(data)
-                                if not img.isNull():
-                                    # Thread-safety: store QImage in worker thread; convert to QPixmap on GUI thread
-                                    cached_favicon_images[tab_id] = img
-                                    signals.update_thumb.emit(tab_id)
-                    except Exception:
-                        pass
-                    finally:
-                        if conn:
-                            try:
-                                conn.close()
-                            except Exception:
-                                pass
-                        fetching_favicons.discard(tab_id)
+            fetching_favicons.add(tab_id)
+            def _fetch():
+                conn = None
+                try:
+                    resolved_ip = socket.gethostbyname(hostname)
+                    ip_obj = ipaddress.ip_address(resolved_ip)
+                    if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved or ip_obj.is_multicast:
+                        return
 
-                threading.Thread(target=_fetch, daemon=True).start()
+                    port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+                    path = parsed.path or '/'
+                    if parsed.query:
+                        path += '?' + parsed.query
+
+                    if parsed.scheme == 'https':
+                        conn = SNIConnection(hostname, resolved_ip, port, timeout=1.5)
+                    else:
+                        conn = http.client.HTTPConnection(resolved_ip, port, timeout=1.5)
+
+                    conn.request('GET', path, headers={'User-Agent': 'TabCircle/1.0', 'Host': hostname})
+                    resp = conn.getresponse()
+                    if resp.status == 200:
+                        data = resp.read(1024 * 1024 + 1)
+                        if len(data) <= 1024 * 1024:  # Max 1MB
+                            img = QImage.fromData(data)
+                            if not img.isNull():
+                                # Thread-safety: store QImage in worker thread; convert to QPixmap on GUI thread
+                                cached_favicon_images[tab_id] = img
+                                signals.update_thumb.emit(tab_id)
+                except Exception:
+                    pass
+                finally:
+                    if conn:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                    fetching_favicons.discard(tab_id)
+
+            threading.Thread(target=_fetch, daemon=True).start()
 
     return draw_globe_icon(size, color=globe_color)
 
@@ -977,6 +1010,95 @@ class SquircleContainer(QFrame):
         super().paintEvent(event)
 
 
+def resolve_target_screen(anchor=None, screens=None, cursor_pos=None, primary_screen=None):
+    """
+    Resolves which screen an anchor (browser window center and/or screen name) belongs to.
+    Handles fractional DPI scaling, multi-monitor geometry, and cursor fallbacks.
+    Compatible with Qt QScreen lists as well as test mock collections.
+    """
+    if screens is None:
+        screens = QGuiApplication.screens()
+    if cursor_pos is None:
+        try:
+            p = QCursor.pos()
+            cursor_pos = (p.x(), p.y())
+        except Exception:
+            cursor_pos = (0, 0)
+    if primary_screen is None:
+        try:
+            primary_screen = QApplication.primaryScreen()
+        except Exception:
+            primary_screen = screens[0] if screens else None
+
+    c = None
+    s_name = None
+    if isinstance(anchor, dict):
+        c = anchor.get("center")
+        s_name = anchor.get("screen_name")
+    elif isinstance(anchor, (tuple, list)):
+        c = anchor
+
+    def _get_name(s):
+        if hasattr(s, "name") and callable(s.name):
+            return s.name()
+        elif hasattr(s, "name") and not callable(s.name):
+            return s.name
+        elif isinstance(s, dict):
+            return s.get("name")
+        return ""
+
+    def _get_geo(s):
+        if hasattr(s, "geometry") and callable(s.geometry):
+            g = s.geometry()
+            return g.x(), g.y(), g.width(), g.height()
+        elif isinstance(s, dict):
+            return s.get("geo", (0, 0, 0, 0))
+        return getattr(s, "geo", (0, 0, 0, 0))
+
+    def _get_dpr(s):
+        if hasattr(s, "devicePixelRatio") and callable(s.devicePixelRatio):
+            return s.devicePixelRatio()
+        elif isinstance(s, dict):
+            return s.get("dpr", 1.0)
+        return getattr(s, "dpr", 1.0)
+
+    target_screen = None
+
+    # 1. Exact match by XRandR monitor output name (e.g. 'eDP-1-0', 'HDMI-1', 'DP-1')
+    if s_name:
+        for s in screens:
+            if _get_name(s) == s_name:
+                target_screen = s
+                break
+
+    # 2. Geometric match accounting for fractional DPR
+    if not target_screen and c:
+        cx, cy = c
+        for s in screens:
+            dpr = _get_dpr(s) or 1.0
+            gx, gy, gw, gh = _get_geo(s)
+            phys_left = round(gx * dpr)
+            phys_top = round(gy * dpr)
+            phys_right = round((gx + gw) * dpr)
+            phys_bottom = round((gy + gh) * dpr)
+            if phys_left <= cx < phys_right and phys_top <= cy < phys_bottom:
+                target_screen = s
+                break
+
+    # 3. Fallback to cursor position or primary screen
+    if not target_screen and cursor_pos:
+        for s in screens:
+            gx, gy, gw, gh = _get_geo(s)
+            if gx <= cursor_pos[0] < gx + gw and gy <= cursor_pos[1] < gy + gh:
+                target_screen = s
+                break
+
+    if not target_screen:
+        target_screen = primary_screen
+
+    return target_screen
+
+
 # --- PyQt6 Overlay Window ---
 class SwitcherOverlay(QWidget):
     """
@@ -1169,48 +1291,20 @@ class SwitcherOverlay(QWidget):
             self._last_anchor = anchor
         info = anchor or getattr(self, "_last_anchor", None)
 
-        c = None
-        s_name = None
-        if isinstance(info, dict):
-            c = info.get("center")
-            s_name = info.get("screen_name")
-        elif isinstance(info, (tuple, list)):
-            c = info
+        target_screen = resolve_target_screen(
+            anchor=info,
+            screens=QGuiApplication.screens(),
+            cursor_pos=(QCursor.pos().x(), QCursor.pos().y()),
+            primary_screen=QApplication.primaryScreen()
+        )
 
-        target_screen = None
+        if info:
+            c = info.get("center") if isinstance(info, dict) else info
+            s_name = info.get("screen_name") if isinstance(info, dict) else None
+            s_disp = target_screen.name() if (target_screen and hasattr(target_screen, "name") and callable(target_screen.name)) else "primary"
+            logger.debug(f"Multi-monitor anchor: cx={c}, name={s_name} -> matched screen: {s_disp}")
 
-        # 1. Exact match by XRandR monitor output name (e.g. 'eDP-1-0', 'HDMI-1', 'DP-1')
-        if s_name:
-            for s in QGuiApplication.screens():
-                if s.name() == s_name:
-                    target_screen = s
-                    break
-
-        # 2. Geometric match accounting for fractional DPR
-        if not target_screen and c:
-            cx, cy = c
-            for s in QGuiApplication.screens():
-                dpr = s.devicePixelRatio()
-                geo = s.geometry()
-                phys_left = round(geo.x() * dpr)
-                phys_top = round(geo.y() * dpr)
-                phys_right = round((geo.x() + geo.width()) * dpr)
-                phys_bottom = round((geo.y() + geo.height()) * dpr)
-                if phys_left <= cx < phys_right and phys_top <= cy < phys_bottom:
-                    target_screen = s
-                    break
-            if not target_screen:
-                dpr = QApplication.primaryScreen().devicePixelRatio() or 1.0
-                target_screen = QGuiApplication.screenAt(QPoint(int(cx / dpr), int(cy / dpr)))
-
-        if not target_screen:
-            target_screen = QGuiApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
-
-        if c:
-            cx, cy = c
-            logger.debug(f"Multi-monitor anchor: cx={cx}, cy={cy}, name={s_name} -> matched screen: {target_screen.name() if target_screen else 'primary'}")
-
-        if target_screen:
+        if target_screen and hasattr(target_screen, "availableGeometry"):
             screen_geo = target_screen.availableGeometry()
             x = screen_geo.x() + (screen_geo.width() - self.width()) // 2
             y = screen_geo.y() + (screen_geo.height() - self.height()) // 2
@@ -1434,6 +1528,13 @@ async def ws_handler(websocket):
                         "tabLifetimeHours": 0,
                         "captureThumbnails": not helper_config.get("low_resource_mode", False)
                     }))
+                elif msg_type == "openSettings":
+                    logger.info("Extension requested settings. On Linux, configure via ~/.config/tabcircle/config.json or pass --low-resource.")
+                elif msg_type in ("pinnedTab", "unpinned", "favoriteBound", "unpinsApplied"):
+                    logger.debug(f"Received favorites/pin sync message: {msg_type} (cross-session favorites persistence is currently macOS-only; ignored on Linux)")
+                elif msg_type == "tabsClosed":
+                    closed_list = data.get("tabs", [])
+                    logger.debug(f"Received {len(closed_list)} closed tab notification(s) from extension")
                 elif msg_type == "log":
                     logger.info(f"[Extension Log] {data.get('message')}")
             except json.JSONDecodeError:
@@ -1462,7 +1563,7 @@ def start_ws_server():
         os._exit(1)
 
 
-# --- Xlib Keyboard Interception ---
+# --- Xlib Keyboard Interception & 3-Layer Browser Window Identification ---
 def get_active_window_class(d, root):
     """Returns the WM_CLASS of the active window."""
     try:
@@ -1500,8 +1601,95 @@ def browser_is_native_wayland(d, root):
     except Exception:
         return True
 
+def get_extension_owner_pids():
+    """PIDs of processes currently connected to our WebSocket port — i.e., the actual browser (or a child process of it)."""
+    pids = set()
+    my_pid = os.getpid()
+    try:
+        out = subprocess.run(
+            ['ss', '-tnp', 'state', 'established', '( sport = :41573 or dport = :41573 )'],
+            capture_output=True, text=True, timeout=1
+        ).stdout
+        for line in out.splitlines():
+            for m in re.findall(r'pid=(\d+)', line):
+                p = int(m)
+                if p != my_pid:
+                    pids.add(p)
+    except Exception:
+        pass
+
+    # Fallback for minimal distributions where iproute2 (ss) is not installed
+    if not pids:
+        try:
+            out = subprocess.run(
+                ['lsof', '-nP', '-iTCP:41573', '-sTCP:ESTABLISHED'],
+                capture_output=True, text=True, timeout=1
+            ).stdout
+            for line in out.splitlines()[1:]:
+                parts = line.split()
+                if len(parts) >= 2 and parts[1].isdigit():
+                    p = int(parts[1])
+                    if p != my_pid:
+                        pids.add(p)
+        except Exception:
+            pass
+
+    return pids
+
+def ancestor_pids(pid, max_depth=12):
+    chain = {pid}
+    current = pid
+    for _ in range(max_depth):
+        try:
+            with open(f"/proc/{current}/stat", "r") as f:
+                content = f.read()
+            fields = content.rsplit(')', 1)[1].split()  # skip past "(comm)"
+            ppid = int(fields[1])
+            if ppid <= 1 or ppid in chain:
+                break
+            chain.add(ppid)
+            current = ppid
+        except Exception:
+            break
+    return chain
+
+def get_window_pid(d, win):
+    try:
+        prop = win.get_full_property(d.intern_atom('_NET_WM_PID'), X.AnyPropertyType)
+        return prop.value[0] if prop and prop.value else None
+    except Exception:
+        return None
+
+def is_browser_window(d, root, win_id, wm_class_str):
+    """
+    Authoritative 3-Layer Browser Detection:
+    1. PID Ancestry: is this window's process an ancestor of anything connected to our WebSocket?
+    2. Fallback: match against BROWSER_CLASSES + extra_browser_classes config escape hatch.
+    """
+    if win_id:
+        try:
+            win = d.create_resource_object('window', win_id)
+            win_pid = get_window_pid(d, win)
+            if win_pid is not None:
+                connected_ancestors = set()
+                for owner_pid in get_extension_owner_pids():
+                    connected_ancestors |= ancestor_pids(owner_pid)
+                if win_pid in connected_ancestors:
+                    logger.debug(f"is_browser_window: pid-match (win_pid={win_pid})")
+                    return True
+        except Exception as e:
+            logger.debug(f"PID correlation notice: {e}")
+
+    extra = helper_config.get("extra_browser_classes", [])
+    matched = any(b in wm_class_str for b in BROWSER_CLASSES + extra)
+    if matched:
+        logger.debug(f"is_browser_window: name-fallback ({wm_class_str})")
+    return matched
+
+_warned_native_wayland = False
+
 def xlib_listener():
-    global _ungrab_display
+    global _ungrab_display, _warned_native_wayland
     d = display.Display()
     _ungrab_display = d
     root = d.screen().root
@@ -1573,6 +1761,18 @@ def xlib_listener():
 
     def sync_window_grab(target_win_id):
         nonlocal grabbed_win_id
+        global _warned_native_wayland
+
+        if get_session_type() == "wayland":
+            if not target_win_id or target_win_id == 0:
+                if not _warned_native_wayland and browser_is_native_wayland(d, root):
+                    _warned_native_wayland = True
+                    logger.warning(
+                        "Wayland session detected with native Wayland browser window. TabCircle needs "
+                        "your browser to run under XWayland to intercept global shortcuts. "
+                        "Launch your browser with: --ozone-platform=x11"
+                    )
+
         if grabbed_win_id == target_win_id:
             return
 
@@ -1591,18 +1791,15 @@ def xlib_listener():
             try:
                 new_win = d.create_resource_object('window', target_win_id)
                 cls_prop = new_win.get_wm_class()
-                if cls_prop:
-                    wm_str = " ".join(cls_prop).lower()
-                    if any(b in wm_str for b in BROWSER_CLASSES):
-                        for mod in modifiers:
-                            new_win.grab_key(tab_keycode, ctrl_mask | mod, False, X.GrabModeAsync, X.GrabModeSync)
-                            new_win.grab_key(tab_keycode, ctrl_mask | X.ShiftMask | mod, False, X.GrabModeAsync, X.GrabModeSync)
-                        grabbed_win_id = target_win_id
-                        logger.debug(f"Attached window-targeted grab to {wm_str} ({target_win_id:#x})")
-                    else:
-                        logger.debug(f"Target window {target_win_id:#x} ({wm_str}) is not a browser; grab disarmed")
+                wm_str = " ".join(cls_prop).lower() if cls_prop else ""
+                if is_browser_window(d, root, target_win_id, wm_str):
+                    for mod in modifiers:
+                        new_win.grab_key(tab_keycode, ctrl_mask | mod, False, X.GrabModeAsync, X.GrabModeSync)
+                        new_win.grab_key(tab_keycode, ctrl_mask | X.ShiftMask | mod, False, X.GrabModeAsync, X.GrabModeSync)
+                    grabbed_win_id = target_win_id
+                    logger.debug(f"Attached window-targeted grab to {wm_str} ({target_win_id:#x})")
                 else:
-                    logger.debug(f"Target window {target_win_id:#x} has no WM_CLASS; grab disarmed")
+                    logger.debug(f"Target window {target_win_id:#x} ({wm_str}) is not a browser; grab disarmed")
             except Exception as e:
                 logger.debug(f"Could not grab window {target_win_id:#x}: {e}")
         d.flush()
@@ -1636,7 +1833,15 @@ def xlib_listener():
 
             if event.type == X.KeyPress and event.detail == tab_keycode:
                 active_class = get_active_window_class(d, root)
-                is_browser = any(b in active_class for b in BROWSER_CLASSES)
+                target_wid = grabbed_win_id
+                if not target_wid:
+                    try:
+                        p = root.get_full_property(net_active_atom, X.AnyPropertyType)
+                        if p and p.value:
+                            target_wid = p.value[0]
+                    except Exception:
+                        pass
+                is_browser = is_browser_window(d, root, target_wid, active_class)
 
                 # Filter tabs by scope (current window if available)
                 tabs_to_show = cached_tabs
@@ -1888,9 +2093,13 @@ def main():
     sig_timer.timeout.connect(lambda: None)
     sig_timer.start(200)
 
-    # Periodic timer to instantly detect browser profile theme toggles in background
+    # Periodic timer to instantly detect browser profile theme toggles in background (active clients only)
+    def check_theme_tick():
+        if ws_clients:
+            get_current_theme()
+
     theme_timer = QTimer()
-    theme_timer.timeout.connect(get_current_theme)
+    theme_timer.timeout.connect(check_theme_tick)
     theme_timer.start(500)
 
     overlay = SwitcherOverlay()

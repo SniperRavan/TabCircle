@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 import time
-import urllib.request
 
 logger = logging.getLogger("TabCircle")
 
@@ -59,9 +58,16 @@ def check_for_update(force=False):
         return
     _record_check_time()
     try:
-        req = urllib.request.Request(API_URL, headers={"User-Agent": "TabCircle-Updater"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.load(resp)
+        import http.client
+        import ssl
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection("api.github.com", timeout=5, context=ctx)  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
+        conn.request("GET", f"/repos/{REPO}/releases/latest", headers={"User-Agent": "TabCircle-Updater"})
+        resp = conn.getresponse()
+        if resp.status != 200:
+            return
+        data = json.loads(resp.read().decode("utf-8"))
+        conn.close()
         latest = data.get("tag_name", "").lstrip("v")
         current = current_version()
         if latest and _version_tuple(latest) > _version_tuple(current):

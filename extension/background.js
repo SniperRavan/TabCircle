@@ -902,7 +902,7 @@ chrome.action.onClicked.addListener(() => {
 });
 
 function ensureAlarms() {
-  chrome.alarms.create(RECONNECT_ALARM, { periodInMinutes: 0.5 });
+  chrome.alarms.create(RECONNECT_ALARM, { periodInMinutes: 1 });
   chrome.alarms.create(LIFETIME_ALARM, { periodInMinutes: LIFETIME_SWEEP_MINUTES });
 }
 

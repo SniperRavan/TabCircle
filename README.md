@@ -5,7 +5,7 @@
 <h3 align="center">TabCircle</h3>
 
 <p align="center">
-  <strong>Supercharge Chrome's tab experience — MRU switching, tab management, and pins that persist.</strong><br>
+  <strong>Supercharge Chrome's tab experience — MRU switching, live previews, and instant navigation.</strong><br>
   Hold <kbd>Ctrl</kbd> and tap <kbd>Tab</kbd> to move through tabs in the order you used them.
 </p>
 
@@ -31,15 +31,14 @@ Chrome cycles tabs in tab-strip order. TabCircle makes `Ctrl + Tab` cycle them b
 
 ## Features
 
-- `Ctrl + Tab` (`⌃ + ⇥`) switches to the tab you used last
-- Tapping `Ctrl + Tab` again returns to where you started, so A↔B toggling stays stable
-- Every tab in the list carries a live page thumbnail
-- Keyboard (`Ctrl + Tab`, `Ctrl + Shift + Tab`), arrow keys and mouse clicks all drive the switcher
-- Two switcher layouts: a horizontal strip, or an adaptive grid that fits every tab on one screen
-- The overlay is centered on the Chrome window in use, across multiple displays
-- Light and dark appearance follow the system setting
-- In-app updates — checks GitHub Releases on a schedule you pick and installs in place after one click
-- If the helper or extension is unavailable, `Ctrl + Tab` falls back to Chrome's built-in behavior
+- **MRU Tab Switching**: `Ctrl + Tab` (`⌃ + ⇥`) switches to the tab you used last; tapping it again returns to where you started for rock-solid A↔B toggling
+- **Visual Previews**: Live page thumbnails with squircle geometry, or lightweight favicon-only mode for low-resource environments
+- **Full Navigation Control**: Keyboard (`Ctrl + Tab`, `Ctrl + Shift + Tab`), arrow keys, and mouse hover/clicks all drive the switcher
+- **Multi-Monitor Display Awareness**: Overlay centers dynamically over the active browser window on multi-monitor setups
+- **Adaptive Theming**: Automatically tracks browser and system light/dark mode
+- **Switcher Layouts**: Horizontal strip on Linux and macOS; adaptive multi-row grid on macOS (Linux grid on roadmap)
+- **Update Checks**: In-app 1-click updates with schedule picker on macOS; background release checking with desktop notifications and manual check CLI on Linux
+- **Graceful Fallback**: If the helper or extension drops, `Ctrl + Tab` transparently falls back to Chrome's native behavior without blocking keystrokes
 
 ## How it works
 
@@ -91,7 +90,7 @@ Grab the files you need from [Releases](https://github.com/sniperravan/TabCircle
 ```bash
 # Download tabcircle-linux.tar.gz from the Releases page, then:
 tar -xzf tabcircle-linux.tar.gz
-cd tabcircle-linux    # or whatever the extracted folder is named
+cd tabcircle-linux
 ./scripts/install-linux.sh
 ```
 
@@ -181,7 +180,7 @@ A successful run looks like:
 | Hold `Ctrl`, tap `Tab` repeatedly | Move further back through the history |
 | Hold `Ctrl`, press `Ctrl + Shift + Tab` | Move forward |
 | Hold `Ctrl`, press `←` or `→` | Move the cursor with arrow keys |
-| Hold `Ctrl`, press `↑` or `↓` | Move by row (grid layout) |
+| Hold `Ctrl`, press `↑` or `↓` | Move by row (macOS grid layout) |
 | Hold `Ctrl`, click a card | Switch to that tab immediately |
 | Hold `Ctrl`, hover a card | Move the cursor with the mouse |
 
@@ -189,7 +188,8 @@ The overlay appears when you press `Tab` and closes when you release `Ctrl`. A s
 
 ### Settings
 
-Open the settings window from the menu bar icon (**Settings…**, or `⌘ + ,` while a TabCircle window is focused) or by clicking the TabCircle icon in the Chrome toolbar. Changes take effect immediately — nothing needs to restart.
+#### macOS
+Open the graphical settings window from the menu bar icon (**Settings…**, or `⌘ + ,` while a TabCircle window is focused) or by clicking the TabCircle icon in the Chrome toolbar. Changes take effect immediately — nothing needs to restart.
 
 | Setting | Default | Effect |
 |---|---|---|
@@ -199,6 +199,15 @@ Open the settings window from the menu bar icon (**Settings…**, or `⌘ + ,` w
 | Language / Appearance / Open at Login | — | Interface language, light/dark override, launch at login. |
 
 Each window keeps its own history either way. Switching the scope setting off merges the lists for display; it does not discard anything.
+
+#### Linux
+Linux does not have a GUI settings window yet. Configuration is managed via CLI flags and `~/.config/tabcircle/config.json`:
+
+- **Low-resource mode** (disables screenshot thumbnails, uses crisp vector favicons): pass `--low-resource` or set `"low_resource_mode": true` in `~/.config/tabcircle/config.json`.
+- **Custom browser forks**: add `"extra_browser_classes": ["my-custom-fork"]` in `~/.config/tabcircle/config.json` to recognize unlisted Chromium derivatives without code changes.
+- **Update checks**: automatic daily background check against GitHub Releases with desktop notifications; check manually anytime via `./scripts/install-linux.sh --check-updates`.
+
+*(Note: Clicking the TabCircle extension toolbar icon on Linux logs configuration guidance to the helper log rather than opening a settings window.)*
 
 ### Tab ordering
 
@@ -271,6 +280,7 @@ TabCircle's Linux helper uses X11 passive grabs (`python-xlib`) to intercept `Ct
     brave-browser --ozone-platform=x11
     ```
     You can also add `--ozone-platform=x11` to your browser's `.desktop` launcher in `~/.local/share/applications/`.
+  - *Note*: Automatic detection of native-Wayland browser windows is not yet implemented. If Ctrl+Tab stops working after a browser update, check whether your browser switched to native Wayland mode.
 - **Roadmap**: True global shortcuts on native Wayland require compositor portal protocols (`org.freedesktop.portal.GlobalShortcuts` via D-Bus). This is tracked for future architectural updates.
 
 ## Acknowledgements & Inspirations

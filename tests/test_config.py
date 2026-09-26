@@ -62,6 +62,13 @@ class TestConfigPrecedence(unittest.TestCase):
             f.write("{ invalid json")
         cfg = app.load_helper_config()
         self.assertFalse(cfg["low_resource_mode"])
+        self.assertEqual(cfg["extra_browser_classes"], [])
+
+    def test_extra_browser_classes_loaded(self):
+        with open(self.tmp_config, "w", encoding="utf-8") as f:
+            json.dump({"extra_browser_classes": ["MyFork", "ANOTHER_BROWSER"]}, f)
+        cfg = app.load_helper_config()
+        self.assertEqual(cfg["extra_browser_classes"], ["myfork", "another_browser"])
 
 if __name__ == "__main__":
     unittest.main()

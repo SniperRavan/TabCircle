@@ -4,10 +4,12 @@
 // between the helper and the service worker.
 
 const WS_URL = "ws://127.0.0.1:41573/";
-const RETRY_MS = 300;
+const INITIAL_RETRY_MS = 300;
+const MAX_RETRY_MS = 30000;
 
 let ws = null;
 let retryTimer = null;
+let retryDelay = INITIAL_RETRY_MS;
 
 self.addEventListener("unhandledrejection", (event) => {
   event.preventDefault();
@@ -63,6 +65,7 @@ function connect() {
   }
 
   ws.onopen = () => {
+    retryDelay = INITIAL_RETRY_MS;
     toWorker({ type: "ws-open" });
     reportTheme();
   };
@@ -91,7 +94,8 @@ function connect() {
 
 function scheduleRetry() {
   clearTimeout(retryTimer);
-  retryTimer = setTimeout(connect, RETRY_MS);
+  retryTimer = setTimeout(connect, retryDelay);
+  retryDelay = Math.min(retryDelay * 1.5, MAX_RETRY_MS);
 }
 
 chrome.runtime.onMessage.addListener((message) => {
